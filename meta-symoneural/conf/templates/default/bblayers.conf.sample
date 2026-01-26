@@ -1,17 +1,11 @@
 POKY_BBLAYERS_CONF_VERSION = "2"
-
 BBPATH = "${TOPDIR}"
 BBFILES ?= ""
-
-# Using only the folders visible in your /var/yocto/symoneural directory
 BBLAYERS ?= " \
-  ${TOPDIR}/../meta \
-  ${TOPDIR}/../meta-openembedded/meta-oe \
-  ${TOPDIR}/../meta-openembedded/meta-python \
-  ${TOPDIR}/../meta-openembedded/meta-networking \
-  ${TOPDIR}/../../meta-arm/meta-arm-toolchain \
-  ${TOPDIR}/../../meta-arm/meta-arm \
-  ${TOPDIR}/../../meta-xilinx/meta-xilinx-core \
-  ${TOPDIR}/../../meta-xilinx/meta-xilinx-bsp \
-  ${TOPDIR}/../meta-symoneural \
+  ##OEROOT##/meta \
+  ##OEROOT##/meta-symoneural \
+  ##OEROOT##/meta-openembedded/meta-oe \
+  ##OEROOT##/meta-openembedded/meta-python \
+  ##OEROOT##/meta-openembedded/meta-networking \
+  ##OEROOT##/meta-clang \
   "
