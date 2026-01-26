@@ -12,6 +12,3 @@ build/
 *.log
 *.swp
 
-# --- SyMoNeuRaL Helpers ---
-surgical.sh
-cleanup.sh
