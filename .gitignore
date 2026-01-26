@@ -1,45 +1,17 @@
+# --- Yocto Standard ---
 bitbake/
-*.pyc
-*.pyo
-/*.patch
-/.repo/
-/build*/
-pyshtables.py
-pstage/
-scripts/oe-git-proxy-socks
-sources/
-
-# 1. THE LAYER LOGIC
-# Ignore all meta layers by default...
-meta-*/
 meta/
-
-# ...BUT explicitly include your custom layer and the templates
+meta-*/
 !meta-symoneural/
 !meta-skeleton/
 !meta-selftest/
 
-# 2. THE BUILD & CACHE LOGIC
-# Since you set DL_DIR and SSTATE_DIR to ${TOPDIR}/../
-# they live in the root of the project. We must ignore them.
-downloads/
-sstate-cache/
-tmp/
+# --- Build Artifacts ---
+# This ignores the 'build' folder inside /var/yocto/symoneural/
 build/
-buildtools/
-
-# 3. OTHER ARTIFACTS
-hob-image-*.bb
+*.log
 *.swp
-*.orig
-*.rej
-*~
-_toaster_clones/
-toaster.sqlite
-.vscode/
 
-# 4. SYMONEURAL SPECIFIC
-# Ignore your local helper scripts and logs
+# --- SyMoNeuRaL Helpers ---
 surgical.sh
 cleanup.sh
-*.log
