@@ -1,0 +1,11 @@
+[Unit]
+Description=SyMoNeuRaL Hardware and App Initialization
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/symoneural-setup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
