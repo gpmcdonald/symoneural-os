@@ -1,4 +1,4 @@
-bitbake
+bitbake/
 *.pyc
 *.pyo
 /*.patch
@@ -8,23 +8,38 @@ pyshtables.py
 pstage/
 scripts/oe-git-proxy-socks
 sources/
+
+# 1. THE LAYER LOGIC
+# Ignore all meta layers by default...
 meta-*/
+meta/
+
+# ...BUT explicitly include your custom layer and the templates
+!meta-symoneural/
+!meta-skeleton/
+!meta-selftest/
+
+# 2. THE BUILD & CACHE LOGIC
+# Since you set DL_DIR and SSTATE_DIR to ${TOPDIR}/../
+# they live in the root of the project. We must ignore them.
+downloads/
+sstate-cache/
+tmp/
+build/
 buildtools/
-!meta-skeleton
-!meta-selftest
+
+# 3. OTHER ARTIFACTS
 hob-image-*.bb
 *.swp
 *.orig
 *.rej
 *~
 _toaster_clones/
-downloads/
-sstate-cache/
 toaster.sqlite
 .vscode/
 
-# SymoNeuRaL Specific
+# 4. SYMONEURAL SPECIFIC
+# Ignore your local helper scripts and logs
 surgical.sh
 cleanup.sh
 *.log
-build/

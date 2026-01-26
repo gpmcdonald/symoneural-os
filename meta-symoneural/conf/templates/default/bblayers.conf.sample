@@ -1,0 +1,16 @@
+# BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+# changes incompatibly
+BBLAYERS_CONF_VERSION = "2"
+
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \
+  ##OEROOT##/meta \
+  ##OEROOT##/meta-openembedded/meta-oe \
+  ##OEROOT##/meta-openembedded/meta-python \
+  ##OEROOT##/meta-openembedded/meta-networking \
+  ##OEROOT##/meta-clang \
+  ##OEROOT##/meta-raspberrypi \
+  ##OEROOT##/meta-symoneural \
+  "
