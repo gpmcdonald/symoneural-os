@@ -1,12 +1,10 @@
-# --- Yocto Standard ---
-bitbake/
-meta-clang/
-meta-openembedded/
-meta-raspberrypi/
-
-# --- Build Artifacts ---
-# This ignores the 'build' folder inside /var/yocto/symoneural/
 build/
-*.log
+bitbake.lock
+pseudodone
+conf/local.conf
+conf/bblayers.conf
+downloads/
+sstate-cache/
+tmp/
+*.pyc
 *.swp
-
