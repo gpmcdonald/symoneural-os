@@ -1,17 +1,31 @@
-SSUMMARY = "SyMoNeuRaL Tiny Init"
-DESCRIPTION = "Minimal boot script for SyMoNeuRaL-tiny distributions."
+SUMMARY = "Symon-tiny init"
+DESCRIPTION = "Basic init system for symon-tiny"
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+LIC_FILES_CHKSUM = "file://${COREBASE}/meta/COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
 
-SRC_URI = "file://init"
+PR = "r2"
+
+RDEPENDS:${PN} = "busybox"
+
+SRC_URI = "file://init \
+	   file://rc.local.sample \
+	  "
 
 S = "${WORKDIR}"
 
-do_install() {
-    install -d ${D}${sysconfdir}
-    install -m 0755 ${WORKDIR}/init ${D}${sysconfdir}/init
-    # Link /init to our script so the kernel finds it
-    ln -sf ${sysconfdir}/init ${D}/init
+do_configure() {
+	:
 }
 
-FILES:${PN} = "/init ${sysconfdir}/init"
+do_compile() {
+	:
+}
+
+do_install() {
+	install -d ${D}${sysconfdir}
+	install -m 0755 ${WORKDIR}/init ${D}
+	install -m 0755 ${WORKDIR}/rc.local.sample ${D}${sysconfdir}
+}
+
+FILES:${PN} = "/init ${sysconfdir}/rc.local.sample"
+RCONFLICTS:${PN} = "systemd"

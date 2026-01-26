@@ -1,7 +1,3 @@
-SUMMARY = "SyMoNeuRaL minimal image"
-DESCRIPTION = "Minimal SyMoNeuRaL image with custom MOTD and user"
-LICENSE = "MIT"
-
 SUMMARY = "SyMoNeuRaL OS Standalone Image"
 DESCRIPTION = "A fully independent image recipe for SyMoNeuRaL OS."
 LICENSE = "MIT"

@@ -10,7 +10,7 @@ echo "Running /etc/rc.local..."
 #setsid /sbin/getty 115200 ttyS2
 
 # Print a banner
-#echo "You are running a symoneural-tiny image brought to you by the Yocto Project."
+#echo "You are running a symon-tiny image brought to you by symoneural-os."
 
 # Setup a debugging environment
 #mkdir /debugfs

@@ -14,8 +14,8 @@ SCONF_VERSION = "1"
 # uncomment these lines to share downloads and compile cache.
 # This prevents downloading the Linux Kernel twice!
 
-# DL_DIR ?= "/var/yocto/downloads"
-# SSTATE_DIR ?= "/var/yocto/sstate-cache"
+# DL_DIR ?= "${TOPDIR}/downloads"
+# SSTATE_DIR ?= "${TOPDIR}/sstate-cache"
 
 # =========================================================================
 # Proxy Settings (Optional)

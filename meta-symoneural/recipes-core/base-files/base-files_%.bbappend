@@ -1,14 +1,11 @@
-# Add our local files directory to the search path
+# Ensure BitBake looks in this layer first for files
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# Add our custom branding files
-SRC_URI += " \
-    file://motd \
-    file://issue \
-"
+# Do NOT rely on file://motd lookup (poky override wins there)
+# Instead, install our own explicitly-named MOTD
+SRC_URI:append = " file://symoneural/motd file://symoneural/issue"
 
-# Install the files into the root filesystem
 do_install:append () {
-    install -m 0644 ${WORKDIR}/motd ${D}${sysconfdir}/motd
-    install -m 0644 ${WORKDIR}/issue ${D}${sysconfdir}/issue
+    install -m 0644 ${WORKDIR}/symoneural/motd ${D}${sysconfdir}/motd
+    install -m 0644 ${WORKDIR}/symoneural/issue ${D}${sysconfdir}/issue
 }
