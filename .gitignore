@@ -1,6 +1,5 @@
 # --- Yocto Standard ---
 bitbake/
-meta/
 meta-clang/
 meta-openembedded/
 meta-raspberrypi/
