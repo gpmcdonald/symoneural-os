@@ -1,21 +1,11 @@
-# SymoNeuRaL Emulation
+# SyMoNeuRaL QEMU Testing
 
-You can test SymoNeuRaL builds using QEMU without needing physical hardware.
-This is useful for testing UI changes or boot scripts before deploying to the Alienware R11.
+Use these commands to test images on your Alienware R11 before flashing hardware.
 
-## Supported Emulation Targets
+## Running x86 Workstation
+`runqemu symon-x86-workstation nographic`
 
-* **qemux86-64**: Simulates a generic 64-bit PC. Best for testing the "Generic x86" image.
-* **qemuarm64**: Simulates a generic 64-bit ARM board. Best for testing logic intended for the Raspberry Pi 4.
+## Running Zynq Miner (Emulated)
+`runqemu symoneural-miner-zynq qemuparams="-m 1024"`
 
-## How to Run
-
-1. **Build the image:**
-   ```bash
-   MACHINE=qemux86-64 bitbake symoneural
-   ```
-
-2. **Run the emulator:**
-   ```bash
-   runqemu qemux86-64
-   ```
+**Note:** GPU acceleration is not available in standard QEMU; use these for logic and init-script testing only.

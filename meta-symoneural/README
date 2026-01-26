@@ -1,4 +1,11 @@
-SyMoNeuRaL is a custom embedded Linux distribution built on the Yocto Project (OpenEmbedded).
+meta-symoneural
+===============
+Main metadata layer for SyMoNeuRaL OS.
 
-Project Structure
-meta-symoneural/: Custom metadata, recipes, and machine configurations.
+Dependencies:
+- poky (scarthgap)
+- meta-openembedded (oe, python, networking)
+
+Hardware:
+- symon-x86-workstation (RTX 50-series)
+- symoneural-miner-zynq (Zynq 7010)
