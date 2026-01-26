@@ -1,10 +1,9 @@
 # --- Yocto Standard ---
 bitbake/
 meta/
-meta-*/
-!meta-symoneural/
-!meta-skeleton/
-!meta-selftest/
+meta-clang/
+meta-openembedded/
+meta-raspberrypi/
 
 # --- Build Artifacts ---
 # This ignores the 'build' folder inside /var/yocto/symoneural/
