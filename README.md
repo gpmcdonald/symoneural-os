@@ -4,7 +4,7 @@ Integrated build environment for high-performance x86 workstations and Zynq-base
 
 ## Project Layout
 - `meta-symoneural/`: Custom metadata layer (Recipes, Machines, Distros).
-- `poky/`: Core Yocto Project build system.
+- `symoneural/`: Core Yocto Project build system.
 - `build/`: Local build output (not tracked).
 
 ## Building
