@@ -3,12 +3,9 @@ POKY_BBLAYERS_CONF_VERSION = "2"
 BBPATH = "${TOPDIR}"
 BBFILES ?= ""
 
-# All layers are in /var/yocto/symoneural/
-# which is ${TOPDIR}/..
+# Using only the folders visible in your /var/yocto/symoneural directory
 BBLAYERS ?= " \
   ${TOPDIR}/../meta \
-  ${TOPDIR}/../meta-poky \
-  ${TOPDIR}/../meta-yocto-bsp \
   ${TOPDIR}/../meta-openembedded/meta-oe \
   ${TOPDIR}/../meta-openembedded/meta-python \
   ${TOPDIR}/../meta-openembedded/meta-networking \
