@@ -1,0 +1,31 @@
+#!/bin/sh
+# SyMoNeuRaL Environment Setup
+# Located in: scripts-symoneural/setup-environment
+
+if [ -n "$BASH_SOURCE" ]; then
+    THIS_SCRIPT=$BASH_SOURCE
+elif [ -n "$ZSH_NAME" ]; then
+    THIS_SCRIPT=%x
+else
+    THIS_SCRIPT=$0
+fi
+SCRIPT_PATH=$(readlink -f "$THIS_SCRIPT")
+# Correct depth: scripts-symoneural/setup-environment -> 2 levels up to Root
+PROJECT_ROOT=$(dirname $(dirname "$SCRIPT_PATH"))
+
+# 1. FORCE TEMPLATE PATH (Custom Flow)
+TEMPLATECONF="$PROJECT_ROOT/meta-symoneural/conf/templates/default"
+if [ ! -f "$PROJECT_ROOT/.templateconf" ] || [ "$(cat $PROJECT_ROOT/.templateconf)" != "$TEMPLATECONF" ]; then
+    echo "$TEMPLATECONF" > "$PROJECT_ROOT/.templateconf"
+fi
+export TEMPLATECONF
+
+# 2. LOCATE OPENEMBEDDED CORE
+export OEROOT="$PROJECT_ROOT/openembedded-core"
+
+# 3. HANDOFF TO BUILD ENGINE
+if [ -z "$OEROOT" ]; then
+    echo >&2 "Error: OEROOT could not be determined."
+    return 1
+fi
+. "$OEROOT/scripts/oe-buildenv-internal" "$@"

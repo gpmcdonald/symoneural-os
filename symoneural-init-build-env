@@ -1,0 +1,32 @@
+#!/bin/bash
+# SyMoNeuRaL Build Initialization Script
+# Forces the environment to use meta-symoneural templates and OpenEmbedded Core.
+
+if [ -z "$ZSH_NAME" ] && [ "$0" = "$BASH_SOURCE" ]; then
+   echo "Error: This script needs to be sourced. Please run as '. $0'"
+   exit 1
+fi
+
+# 1. HARDCODE THE ROOT TO OPENEMBEDDED-CORE (Bypass Poky)
+# We find where this script is, then point OEROOT to the submodule.
+if [ -n "$BASH_SOURCE" ]; then
+   THIS_SCRIPT=$BASH_SOURCE
+elif [ -n "$ZSH_NAME" ]; then
+   THIS_SCRIPT=%x
+else
+   THIS_SCRIPT=$0
+fi
+
+PROJECT_ROOT=$(dirname $(readlink -f $THIS_SCRIPT))
+OEROOT="$PROJECT_ROOT/openembedded-core"
+
+# 2. FORCE THE SYMONEURAL TEMPLATE PATH
+# This tells BitBake: "Do not look for default/poky. Look HERE."
+export TEMPLATECONF="$PROJECT_ROOT/meta-symoneural/conf/templates/default"
+
+# 3. SET LAYERS TO AVOID POKY CONTAMINATION
+export BBLAYERS_CONF_PATH="$PROJECT_ROOT/meta-symoneural/conf/layer.conf"
+
+# 4. HANDOFF TO THE INTERNAL BUILD ENGINE
+unset BBPATH
+. $OEROOT/scripts/oe-buildenv-internal $1

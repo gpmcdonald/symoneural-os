@@ -1,0 +1,19 @@
+### SymoNeuRaL Build Environment ###
+
+The environment is ready. You can now run 'bitbake <target>'.
+
+data-set Targets:
+    symoneural           - The main SymoNeuRaL OS image
+    core-image-minimal   - Smallest bootable image (good for testing)
+
+Supported Machines:
+    alienware-r11        - Desktop / NVIDIA RTX 5070 Ti (Default)
+    rpi4-64              - Raspberry Pi 4 (64-bit)
+    generic-x86          - Generic UEFI x86
+    qemux86-64           - Emulation / Debugging
+
+Common Commands:
+    bitbake symoneural   - Build the full OS
+    bitbake -c menuconfig virtual/kernel  - Configure Linux Kernel
+    runqemu qemux86-64   - Run the emulator (if using QEMU machine)
+    bitbake-layers show-layers  - Verify your layer setup
