@@ -1,7 +1,7 @@
 #!/bin/bash
 # synapse: SyMoNeuRaL Build Portal
 
-# 1. ROBUST ROOT DETECTION
+# 1. ROOT DETECTION
 SOURCE="${BASH_SOURCE[0]}"
 while [ -h "$SOURCE" ]; do
   DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
@@ -10,46 +10,52 @@ while [ -h "$SOURCE" ]; do
 done
 ROOT_DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
 
-# 2. AUTO-REPAIR SUBMODULES
-if [ ! -f "$ROOT_DIR/openembedded-core/meta/conf/layer.conf" ]; then
-    echo "➜ synapse: Engine missing. Initializing submodules..."
-    cd "$ROOT_DIR" || exit 1
-    git submodule update --init --recursive
+# 2. ENGINE CHECK
+if [ ! -d "$ROOT_DIR/meta-symoneural/meta" ]; then
+    echo "❌ CRITICAL: 'meta-symoneural/meta' is missing!"
+    exit 1
 fi
 
-# 3. MENU
+# 3. FIND INIT SCRIPT
+if [ -f "$ROOT_DIR/openembedded-core/oe-init-build-env" ]; then
+    STANDARD_INIT="openembedded-core/oe-init-build-env"
+elif [ -f "$ROOT_DIR/scripts/oe-buildenv-internal" ]; then
+    STANDARD_INIT="scripts/oe-buildenv-internal"
+else
+    echo "❌ Error: Could not find Yocto init script."
+    exit 1
+fi
+
+# 4. MENU
 echo "===================================================="
 echo "    S Y N A P S E  -  SyMoNeuRaL OS Portal"
 echo "===================================================="
-echo " 1) symoneural-image-base   (Custom / Headless)"
-echo " 2) symoneural-image-gui    (Custom / RTX 5070 Ti)"
+echo " 1) symoneural-image-base   (Custom / Minimal)"
+echo " 2) symoneural-image-gui    (Custom / Minimal)"
 echo " 3) core-image-minimal      (Upstream Reference)"
 echo " 4) Factory Reset           (Clean All Build Dirs)"
 echo "----------------------------------------------------"
 read -p "Selection: " choice
 
-# 4. LOGIC
+# 5. LOGIC
 case $choice in
     1|2)
         TARGET_DIR="symoneural-build"
-        # TARGET A: Point to scripts-symoneural
-        LINK_TARGET="scripts-symoneural/setup-environment"
+        T_PATH="meta-symoneural/conf/templates/default"
         [ "$choice" == "1" ] && TARGET="symoneural-image-base" || TARGET="symoneural-image-gui"
         ;;
     3)
         TARGET_DIR="oe-core-ref-build"
-        # TARGET B: Point to upstream scripts
-        LINK_TARGET="openembedded-core/oe-init-build-env"
+        T_PATH="meta/conf/templates/default"
         TARGET="core-image-minimal"
         ;;
     4)
-        cd "$ROOT_DIR" || exit 1
         echo "➜ synapse: Wiping build directories..."
-        rm -rf symoneural-build oe-core-ref-build .templateconf symoneural-init-build-env
-        echo "✓ Reset complete. Scrubbing memory..."
-        unset BBPATH BUILDDIR TEMPLATECONF OEROOT
-        export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games"
-        echo "➜ Spawning clean shell..."
+        cd "$ROOT_DIR"
+        if [ -d "symoneural-build" ]; then sudo rm -rf symoneural-build; fi
+        if [ -d "oe-core-ref-build" ]; then sudo rm -rf oe-core-ref-build; fi
+        rm -f .templateconf synapse-init-build-env
+        echo "✓ Reset complete."
         exec bash
         ;;
     *)
@@ -58,24 +64,31 @@ case $choice in
         ;;
 esac
 
-# 5. INITIALIZATION
+# 6. EXECUTION
 cd "$ROOT_DIR" || exit 1
 
-echo "➜ Configuring Smart Link..."
-rm -f symoneural-init-build-env
-ln -s "$LINK_TARGET" symoneural-init-build-env
+# A. Create the interface link
+rm -f synapse-init-build-env
+ln -s "$STANDARD_INIT" synapse-init-build-env
 
-echo "   Linked: symoneural-init-build-env -> $LINK_TARGET"
-echo "   Target: $TARGET_DIR"
+# B. Set the template variable (FIX FOR "not found" ERROR)
+export TEMPLATECONF="$ROOT_DIR/$T_PATH"
+# We write the variable assignment so the script doesn't try to execute a directory path
+echo "TEMPLATECONF=\"$T_PATH\"" > .templateconf
 
-source ./symoneural-init-build-env "$TARGET_DIR"
+# C. Run the build init (SILENCED)
+# This hides "You had no conf...", "Yocto docs...", etc.
+source ./synapse-init-build-env "$TARGET_DIR" > /dev/null
 
+# D. Explicitly Show YOUR Custom Notes
 echo "----------------------------------------------------"
 echo "✓ Environment Ready: $TARGET"
-echo "➜ Run: bitbake $TARGET"
 echo "----------------------------------------------------"
+if [ -f "$ROOT_DIR/$T_PATH/conf-notes.txt" ]; then
+    cat "$ROOT_DIR/$T_PATH/conf-notes.txt"
+fi
+echo ""
 
-# 6. SHELL HANDOFF
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     export PS1="\[\e[1;32m\]synapse\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ "
     bash --rcfile <(echo "source /etc/bash.bashrc; source ~/.bashrc; export PS1='\[\e[1;32m\]synapse\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '") -i

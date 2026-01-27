@@ -3,8 +3,7 @@ BBPATH = "${TOPDIR}"
 BBFILES ?= ""
 
 BBLAYERS ?= " \
-  ##OEROOT##/openembedded-core/meta \
-  ##OEROOT##/meta-poky \
+  ##OEROOT##/meta-symoneural/meta \
   ##OEROOT##/meta-symoneural \
-  ##OEROOT##/meta-symoneural-bsp \
+  ##OEROOT##/meta-openembedded/meta-oe \
   "

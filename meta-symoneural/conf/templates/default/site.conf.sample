@@ -1,32 +1,4 @@
-#
-# SymoNeuRaL Site Configuration
-# =============================
-# local.conf covers settings for THIS build directory.
-# site.conf covers settings for THIS COMPUTER (shared across builds).
-#
-# SCONF_VERSION is increased each time build/conf/site.conf changes incompatibly
+# SyMoNeuRaL Site Configuration
 SCONF_VERSION = "1"
-
-# =========================================================================
-# Shared Cache Locations (HIGHLY RECOMMENDED)
-# =========================================================================
-# If you have multiple build directories (e.g. one for RPi, one for Alienware),
-# uncomment these lines to share downloads and compile cache.
-# This prevents downloading the Linux Kernel twice!
-
 # DL_DIR ?= "${TOPDIR}/downloads"
 # SSTATE_DIR ?= "${TOPDIR}/sstate-cache"
-
-# =========================================================================
-# Proxy Settings (Optional)
-# =========================================================================
-# Only uncomment these if you are behind a restrictive corporate firewall.
-
-# HTTP/HTTPS Proxy
-# http_proxy = "http://proxy.example.com:8080"
-# https_proxy = "http://proxy.example.com:8080"
-# no_proxy = "localhost,127.0.0.1"
-
-# Git Proxy
-# ALL_PROXY ?= "socks://socks.example.com:1080"
-# GIT_PROXY_COMMAND ?= "oe-git-proxy"
