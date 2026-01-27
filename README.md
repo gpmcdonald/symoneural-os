@@ -22,6 +22,7 @@ bitbake core-image-minimal
 
 ## 📂 Repository Structure
 - `meta-symoneural/`: Primary project metadata (Recipes, Machines, Distros).
+- `meta-symoneural-bsp/`: Hardware abstraction layer (Machine configs & BSP).
 - `meta-poky/`: The official Yocto Project reference distribution layer.
 - `openembedded-core/`: Upstream build engine (Submodule).
 - `bitbake/`: Task execution engine (Submodule).
