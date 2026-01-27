@@ -1,37 +1,33 @@
 # SyMoNeuRaL OS (Scarthgap Edition)
 
-A flexible OpenEmbedded-based framework designed for custom Linux development. SyMoNeuRaL follows a Poky-style flat-root architecture, providing a complete ecosystem for distribution and hardware development.
+A professional OpenEmbedded-based framework following the Poky flat-root architecture. This repository separates OS Policy from Hardware BSP and provides two distinct build pathways.
 
 ## 🏗 Build Architecture
 
-### Environment Initialization
-
-**SyMoNeuRaL Environment**
-Initializes with custom metadata, machine logic, and distro policy.
+### 1. SyMoNeuRaL Environment (Custom OS)
+Initializes using custom branding, policies, and hardware optimizations for the **RTX 5070 Ti**.
 ```bash
-source configure-symoneural symoneural-build
-bitbake symoneural-image-tiny
+TEMPLATECONF="meta-symoneural/conf/templates/default" source configure-symoneural symoneural-build
+bitbake symoneural-image-base
 ```
 
-**OpenEmbedded Reference Build**
-Initializes a clean-room environment using upstream OE-Core samples.
+### 2. OpenEmbedded Reference Build (Clean Room)
+Initializes a clean, upstream environment using only core metadata.
 ```bash
-TEMPLATECONF="meta/conf/templates/default" source configure-oe-ref oe-core-ref-build
+TEMPLATECONF="openembedded-core/meta/conf/templates/default" source configure-oe-ref oe-core-ref-build
 bitbake core-image-minimal
 ```
 
 ## 📂 Repository Structure
-- `meta-symoneural/`: Primary project metadata (Recipes, Machines, Distros).
-- `meta-symoneural-bsp/`: Hardware abstraction layer (Machine configs & BSP).
-- `meta-poky/`: The official Yocto Project reference distribution layer.
+- `meta-symoneural/`: OS Policy & Distro layer (Priority 7).
+- `meta-symoneural-bsp/`: Hardware Abstraction layer (Priority 6).
+- `meta-poky/`: Yocto Project reference distribution (Submodule).
 - `openembedded-core/`: Upstream build engine (Submodule).
 - `bitbake/`: Task execution engine (Submodule).
-- `meta/`: Standard OE-Core metadata.
-- `meta-{skeleton,selftest}/`: Reference and testing metadata layers.
-- `scripts/`: Utility and maintenance scripts.
+- `scripts/`: Maintenance and alignment utilities.
 
-## 🛠 Prerequisites
-Synchronize submodules before initialization:
+## 🛠 Setup
+Synchronize submodules before first use:
 ```bash
 git submodule update --init --recursive
 ```
