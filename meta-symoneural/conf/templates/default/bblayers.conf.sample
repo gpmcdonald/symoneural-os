@@ -1,11 +1,10 @@
-POKY_BBLAYERS_CONF_VERSION = "2"
+LCONF_VERSION = "7"
 BBPATH = "${TOPDIR}"
 BBFILES ?= ""
+
 BBLAYERS ?= " \
-  ##OEROOT##/meta \
+  ##OEROOT##/openembedded-core/meta \
+  ##OEROOT##/meta-poky \
   ##OEROOT##/meta-symoneural \
-  ##OEROOT##/meta-openembedded/meta-oe \
-  ##OEROOT##/meta-openembedded/meta-python \
-  ##OEROOT##/meta-openembedded/meta-networking \
-  ##OEROOT##/meta-clang \
+  ##OEROOT##/meta-symoneural-bsp \
   "
