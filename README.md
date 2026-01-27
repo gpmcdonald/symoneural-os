@@ -21,10 +21,10 @@ The `synapse` portal is the intelligent management tool for this repository. It 
 ### Usage
 ```bash
 # Run directly
-./scripts/synapse.sh
+./scripts-symoneural/synapse.sh
 
 # Optional: Install to path
-./scripts/synapse.sh --install
+./scripts-symoneural/synapse.sh --install
 
 # Launch globally
 synapse
