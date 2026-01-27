@@ -7,7 +7,7 @@ A professional OpenEmbedded-based framework following the Poky flat-root archite
 ### 1. SyMoNeuRaL Environment (Custom OS)
 Initializes using custom branding, policies, and hardware optimizations for the **RTX 5070 Ti**.
 ```bash
-TEMPLATECONF="meta-symoneural/conf/templates/default" source configure-symoneural symoneural-build
+TEMPLATECONF="meta-symoneural/conf/templates/symoneural-templates" source configure-symoneural symoneural-build
 bitbake symoneural-image-base
 ```
 
