@@ -1,19 +1,32 @@
-### SymoNeuRaL Build Environment ###
+### Your shell environment is now set up for builds. ###
 
-The environment is ready. You can now run 'bitbake <target>'.
+You can now run 'bitbake <target>'
 
-data-set Targets:
-    symoneural           - The main SymoNeuRaL OS image
-    core-image-minimal   - Smallest bootable image (good for testing)
+Common Machines are:
+    symon-x86-workstation (Alienware R11)
+    symoneural-miner-zynq (FPGA)
+    qemux86-64            (Emulation)
 
-Supported Machines:
-    alienware-r11        - Desktop / NVIDIA RTX 5070 Ti (Default)
-    rpi4-64              - Raspberry Pi 4 (64-bit)
-    generic-x86          - Generic UEFI x86
-    qemux86-64           - Emulation / Debugging
+Common target images are:
+    symoneural-image-base   (Standard console image)
+    symoneural-image-gui    (Full desktop image with UI)
+    core-image-minimal
+    core-image-full-cmdline
+    core-image-sato
+    core-image-weston
+    meta-toolchain
+    meta-ide-support
 
-Common Commands:
-    bitbake symoneural   - Build the full OS
-    bitbake -c menuconfig virtual/kernel  - Configure Linux Kernel
-    runqemu qemux86-64   - Run the emulator (if using QEMU machine)
-    bitbake-layers show-layers  - Verify your layer setup
+You can also run generated qemu images with a command like 'runqemu qemux86-64'.
+
+Useful Commands:
+  bitbake -c menuconfig virtual/kernel
+  bitbake-layers show-layers
+
+Other commonly useful commands are:
+ - 'devtool' and 'recipetool' handle common recipe tasks
+ - 'bitbake-layers' handles common layer tasks
+ - 'oe-pkgdata-util' handles common target package tasks
+
+
+
