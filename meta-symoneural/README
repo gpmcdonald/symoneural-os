@@ -9,3 +9,20 @@ Dependencies:
 Hardware:
 - symon-x86-workstation (RTX 50-series)
 - symoneural-miner-zynq (Zynq 7010)
+## Integrating External Metadata
+
+To maintain the integrity of the SyMoNeuRaL environment while extending functionality from other layers (e.g., meta-openembedded), follow these established patterns:
+
+### 1. Recipe Augmentation (The .bbappend Pattern)
+This is the preferred method for modifying existing recipes without forking code.
+- Create a corresponding `.bbappend` file in your layer.
+- Ensure the directory structure matches the original layer (e.g., `recipes-connectivity/openssh/openssh_%.bbappend`).
+
+### 2. Recipe Vendoring (Local Overrides)
+If a specific recipe version is required that is not available in upstream layers:
+- Copy the recipe folder into `meta-symoneural`.
+- Maintain the original `LICENSE` and `LIC_FILES_CHKSUM`.
+- Use a local version suffix if modifications are significant (e.g., `recipe_version-symon.bb`).
+
+### 3. Feature Selection (Distro Features)
+For global policy changes, avoid modifying recipes directly. Instead, extend `DISTRO_FEATURES` or `PREFERRED_VERSION` within `conf/distro/symonos.conf`.

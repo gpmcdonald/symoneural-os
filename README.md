@@ -1,38 +1,35 @@
 # SyMoNeuRaL OS (Scarthgap Edition)
 
-Integrated build environment for high-performance x86 workstations and Zynq-based embedded miners.
+A high-performance Linux distribution framework targeting x86_64 workstations and Zynq-7000 embedded systems.
 
-## 🚀 Getting Started
+## 🏗 Build Architecture
 
-### 1. First-Time Setup (Crucial)
-Before building, you must initialize the submodules to download the core engines:
-```bash
-git submodule update --init --recursive
-```
+SyMoNeuRaL utilizes a flat OpenEmbedded-Core structure for maximum transparency and build performance.
 
-Choose your environment path based on your requirements:
+### Environment Initialization
 
-### Option A: SyMoNeuRaL OS (Recommended)
-Use this for the custom SyMoNeuRaL identity, 6.12 kernel, and hardware-specific optimizations.
-- **Config source:** Uses `meta-symoneural/conf/templates/default`
+Choose the target profile:
+
+**SyMoNeuRaL Standard Build**
 ```bash
 source configure-symoneural build
 bitbake symoneural-image-tiny
 ```
 
-### Option B: Vanilla OpenEmbedded (Standard)
-Use this to get a 100% standard OpenEmbedded environment. This generates the full, annotated upstream `local.conf` with default `nodistro` settings.
-- **Config source:** Uses `openembedded-core/meta/conf/templates/default`
+**Upstream Reference Build**
 ```bash
 TEMPLATECONF="openembedded-core/meta/conf/templates/default" source configure-vanilla-testing build-vanilla
 bitbake core-image-minimal
 ```
 
-## Project Layout
-- `meta-symoneural/`: Custom metadata layer (Recipes, Machines, Distros).
-- `openembedded-core/`: Core build system engine (Submodule).
-- `bitbake/`: Build tool (Submodule).
+## 📂 Repository Structure
+- `meta-symoneural/`: Custom policy, hardware support, and core recipes.
+- `openembedded-core/`: Upstream build engine (locked to Scarthgap).
+- `bitbake/`: Task execution engine.
+- `meta-openembedded/`: Community maintained software layers.
 
-## Hardware Support
-- **Workstation:** symon-x86-workstation (NVIDIA RTX 5070 Ti)
-- **Miner:** symoneural-miner-zynq (Xilinx Zynq-7010)
+## 🛠 Prerequisites
+Ensure all submodules are synchronized before initialization:
+```bash
+git submodule update --init --recursive
+```
