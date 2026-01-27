@@ -13,7 +13,7 @@
 [submodule "openembedded-core"]
 	branch = scarthgap
 	path = openembedded-core
-	url = https://git.openembedded.org/openembedded-core
+	url = https://github.com/openembedded/openembedded-core.git
 [submodule "meta-poky"]
 	path = meta-poky
 	url = https://github.com/yoctoproject/poky.git
