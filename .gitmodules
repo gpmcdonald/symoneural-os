@@ -1,7 +1,7 @@
 [submodule "bitbake"]
 	path = bitbake
 	url = https://github.com/openembedded/bitbake.git
-	branch = scarthgap
+	branch = 2.8
 [submodule "meta-openembedded"]
 	path = meta-openembedded
 	url = https://github.com/openembedded/meta-openembedded.git
@@ -10,3 +10,7 @@
 	path = meta-clang
 	url = https://github.com/kraj/meta-clang.git
 	branch = scarthgap
+[submodule "openembedded-core"]
+	branch = scarthgap
+	path = openembedded-core
+	url = https://git.openembedded.org/openembedded-core

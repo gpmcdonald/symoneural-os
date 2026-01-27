@@ -4,8 +4,6 @@ A flexible OpenEmbedded-based framework designed for custom Linux development. S
 
 ## 🏗 Build Architecture
 
-SyMoNeuRaL is structured as a modular framework. You can choose to use the SyMoNeuRaL policy or revert to a standard Reference Build at any time.
-
 ### Environment Initialization
 
 **SyMoNeuRaL Environment**
