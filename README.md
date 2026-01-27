@@ -2,7 +2,7 @@
 
 A professional OpenEmbedded-based framework following the Poky flat-root architecture.
 
-## 🏗 Build Architecture
+# 🏗 Build Architecture
 
 ### 1. SyMoNeuRaL Environment (Custom OS)
 Initializes using custom branding, policies, and hardware optimizations for the **RTX 5070 Ti**.
