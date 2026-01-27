@@ -1,6 +1,6 @@
 # SyMoNeuRaL OS (Scarthgap Edition)
 
-A professional OpenEmbedded-based framework following the Poky flat-root architecture. This repository separates OS Policy from Hardware BSP and provides two distinct build pathways. This environment is configured for **Debian 13** and is designed to be **untunneled**.
+A professional OpenEmbedded-based framework following the Poky flat-root architecture.
 
 ## 🏗 Build Architecture
 
@@ -35,12 +35,12 @@ synapse --remove
 
 ## 📂 Repository Structure
 
-* **meta-symoneural/**: OS Policy & Distro layer (Priority 7).
-* **meta-symoneural-bsp/**: Hardware Abstraction layer (Priority 6).
-* **meta-poky/**: Yocto Project reference distribution (Submodule).
-* **openembedded-core/**: Upstream build engine (Submodule).
-* **bitbake/**: Task execution engine (Submodule).
-* **scripts/**: Maintenance and alignment utilities.
+* **meta-symoneural/**: OS Policy & Distro layer
+* **meta-symoneural-bsp/**: Hardware Abstraction layer
+* **meta-poky/**: Yocto Project reference distribution (Submodule)
+* **openembedded-core/**: Upstream build engine (Submodule)
+* **bitbake/**: Task execution engine (Submodule)
+* **scripts/**: Maintenance and alignment utilities
 
 ## 🛠 Setup
 
