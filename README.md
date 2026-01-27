@@ -4,6 +4,12 @@ Integrated build environment for high-performance x86 workstations and Zynq-base
 
 ## 🚀 Getting Started
 
+### 1. First-Time Setup (Crucial)
+Before building, you must initialize the submodules to download the core engines:
+```bash
+git submodule update --init --recursive
+```
+
 Choose your environment path based on your requirements:
 
 ### Option A: SyMoNeuRaL OS (Recommended)
