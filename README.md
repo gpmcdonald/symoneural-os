@@ -4,32 +4,29 @@ A high-performance Linux distribution framework targeting x86_64 workstations an
 
 ## 🏗 Build Architecture
 
-SyMoNeuRaL utilizes a flat OpenEmbedded-Core structure for maximum transparency and build performance.
-
 ### Environment Initialization
 
-Choose the target profile:
-
 **SyMoNeuRaL Standard Build**
+Initializes with custom SyMoNeuRaL metadata, machine logic, and distro policy.
 ```bash
-source configure-symoneural build
+source configure-symoneural symoneural-build
 bitbake symoneural-image-tiny
 ```
 
-**Upstream Reference Build**
+**OpenEmbedded Reference Build**
+Initializes a clean-room environment using upstream OE-Core samples for verification. This operates exactly as a standalone OE-Core clone.
 ```bash
-TEMPLATECONF="openembedded-core/meta/conf/templates/default" source configure-vanilla-testing build-vanilla
+TEMPLATECONF="meta/conf/templates/default" source configure-oe-ref oe-core-ref-build
 bitbake core-image-minimal
 ```
 
 ## 📂 Repository Structure
 - `meta-symoneural/`: Custom policy, hardware support, and core recipes.
-- `openembedded-core/`: Upstream build engine (locked to Scarthgap).
-- `bitbake/`: Task execution engine.
-- `meta-openembedded/`: Community maintained software layers.
+- `openembedded-core/`: Upstream build engine (Submodule).
+- `bitbake/`: Task execution engine (Submodule).
 
 ## 🛠 Prerequisites
-Ensure all submodules are synchronized before initialization:
+Before first use, synchronize the submodules:
 ```bash
 git submodule update --init --recursive
 ```
