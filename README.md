@@ -9,29 +9,30 @@ SyMoNeuRaL is structured as a modular framework. You can choose to use the SyMoN
 ### Environment Initialization
 
 **SyMoNeuRaL Environment**
-Initializes with custom metadata, machine logic, and distro policy (Standard SyMoNeuRaL workflow).
+Initializes with custom metadata, machine logic, and distro policy.
 ```bash
 source configure-symoneural symoneural-build
 bitbake symoneural-image-tiny
 ```
 
 **OpenEmbedded Reference Build**
-Initializes a clean-room environment using upstream OE-Core samples. This operates exactly as a standalone OE-Core/Poky clone.
+Initializes a clean-room environment using upstream OE-Core samples.
 ```bash
 TEMPLATECONF="meta/conf/templates/default" source configure-oe-ref oe-core-ref-build
 bitbake core-image-minimal
 ```
 
 ## 📂 Repository Structure
-- `meta-symoneural/`: Custom metadata layer (Recipes, Machines, Distros).
+- `meta-symoneural/`: Primary project metadata (Recipes, Machines, Distros).
 - `meta-poky/`: The official Yocto Project reference distribution layer.
 - `openembedded-core/`: Upstream build engine (Submodule).
 - `bitbake/`: Task execution engine (Submodule).
-- `meta-*`: Core metadata layers (meta, meta-skeleton, meta-selftest).
+- `meta/`: Standard OE-Core metadata.
+- `meta-{skeleton,selftest}/`: Reference and testing metadata layers.
 - `scripts/`: Utility and maintenance scripts.
 
 ## 🛠 Prerequisites
-Synchronize submodules to populate the core engines:
+Synchronize submodules before initialization:
 ```bash
 git submodule update --init --recursive
 ```
