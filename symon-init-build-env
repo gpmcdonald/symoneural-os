@@ -1,0 +1,21 @@
+#!/bin/sh
+export OEROOT="$(pwd)"
+export BITBAKEDIR="$OEROOT/sources/bitbake"
+export PATH="$OEROOT/sources/openembedded-core/scripts:$BITBAKEDIR/bin:$PATH"
+export PAGER=cat
+export TERM=dumb
+
+# Fixed: Combined the source command and suppressed output properly
+. "$OEROOT/sources/openembedded-core/scripts/oe-buildenv-internal" > /dev/null 2>&1
+. "$OEROOT/sources/openembedded-core/scripts/oe-setup-builddir" "$@" > /dev/null 2>&1
+
+mkdir -p "$BUILDDIR/conf/.info"
+[ -f "$BUILDDIR/conf/conf-summary.txt" ] && mv "$BUILDDIR/conf/conf-summary.txt" "$BUILDDIR/conf/.info/"
+[ -f "$BUILDDIR/conf/conf-notes.txt" ] && mv "$BUILDDIR/conf/conf-notes.txt" "$BUILDDIR/conf/.info/"
+
+/bin/cat "$BUILDDIR/conf/.info/conf-summary.txt"
+/bin/cat "$BUILDDIR/conf/.info/conf-notes.txt"
+
+export TERM=xterm-256color
+unset PAGER
+cd "$BUILDDIR"

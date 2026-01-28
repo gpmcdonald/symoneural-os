@@ -1,1 +1,3 @@
-TEMPLATECONF="meta-symoneural/conf/templates/default"
+# This file is used by oe-setup-builddir
+# It points to your custom templates by default
+TEMPLATECONF=${TEMPLATECONF:-meta-symon/conf/templates/default}
