@@ -34,4 +34,9 @@ esac
 
 # 4. INITIALIZE
 cd "$OEROOT"
+# Industry Standard: Tell the OE scripts exactly where BitBake lives
+# in our custom 'sources' layout so discovery doesn't fail.
+export BITBAKEDIR="$OEROOT/sources/bitbake"
+
+# Now source the official entry point
 . ./oe-init-build-env "$BDIR"
