@@ -7,4 +7,9 @@
     {"name": "meta-symon", "branch": "main", "priority": 7},
     {"name": "meta-symoneural-bsp", "branch": "main", "priority": 6}
   ]
+    "yocto_components": [
+  { "name": "openembedded-core", "branch": "scarthgap", "revision": "some-sha" },
+  { "name": "poky", "branch": "scarthgap" }
+]
 }
+
