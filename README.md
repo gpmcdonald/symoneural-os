@@ -1,7 +1,16 @@
-# SyMoNeuRaL OS: Scarthgap Migration Project
+# SyMoNeuRaL OS (Scarthgap Migration)
 
-**SyMoNeuRaL OS** is a Yocto-based system orchestrator designed for **high-performance computing (HPC)** and **embedded FPGA applications**. This project is currently undergoing migration to the **Scarthgap LTS (v2.8)** release.
+A Yocto-based system orchestrator project designed for high-performance computing and embedded FPGA applications.  
+Currently migrating to the **Scarthgap LTS** release (Yocto 5.0.x).
 
+# 🚀 Getting Started
+
+## 1. Initialize the Workspace
+
+Run the sync tool to initialize submodules (BitBake, OE-Core, etc.), verify project anchors, align branches to Scarthgap, and fix permissions:
+
+```bash
+./symon-sync.sh
 ---
 
 ## 🚀 Getting Started
