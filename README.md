@@ -9,7 +9,7 @@ Run the sync tool to initialize submodules (BitBake, OE-Core), verify project an
 ```bash
 ./symon-sync.sh
 
-2. Enter the Build Environment
+### 2. Enter the Build Environment
 The portal manages build directory isolation to prevent configuration pollution. You must source the portal to correctly land in the build directory:
 
 source ./scripts/symon-portal.sh
