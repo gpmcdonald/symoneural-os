@@ -1,42 +1,82 @@
-# SyMoNeuRaL OS (Scarthgap Migration)
-A Yocto-based system orchestrator project designed for high-performance computing and embedded FPGA applications. This project is currently undergoing a migration to the **Scarthgap LTS** release.
+Here's a polished version of your README that improves the layout, enhances readability, and makes it look more professional:
 
-# 🚀 Getting Started
+---
 
-## 1. Initialize the Workspace
-### Run the sync tool to initialize submodules (BitBake, OE-Core), verify project anchors, and set proper execution permissions:
+# SyMoNeuRaL OS: Scarthgap Migration Project
 
+**SyMoNeuRaL OS** is a Yocto-based system orchestrator designed for **high-performance computing (HPC)** and **embedded FPGA applications**. This project is currently undergoing migration to the **Scarthgap LTS (v2.8)** release.
+
+---
+
+## 🚀 Getting Started
+
+Follow the steps below to set up and begin using SyMoNeuRaL OS.
+
+### 1. Initialize the Workspace
+
+Use the included synchronization tool to initialize submodules (BitBake, OE-Core), verify project anchors, and configure execution permissions:
+
+```bash
 ./symon-sync.sh
+```
 
-## 2. Enter the Build Environment
+### 2. Enter the Build Environment
 
-### The portal manages build directory isolation to prevent configuration pollution. You must source the portal to correctly land in the build directory:
-##### source ./scripts/symon-portal.sh
+The build portal ensures isolated and clean configuration directories. Source the portal script to access the appropriate environment:
 
-##### Option 1: Custom SyMoNeuRaL environment (lands in symon-build/)
-##### Option 2: Pure Upstream Poky environment (lands in poky-buil
+```bash
+source ./scripts/symon-portal.sh
+```
 
-# Project Structure
-## Submodules for Yocto engines (BitBake and OE-Core).
+You can choose between:
+- **Custom SyMoNeuRaL Environment**: Lands in `symon-build/`
+- **Pure Upstream Poky Environment**: Lands in `poky-build/`
 
-### meta-symon/
-#### Custom system orchestrator layer and Scarthgap migration templates.
+---
 
-### scripts/
-#### Audit engine (symon-audit.py) and Management Portal (symon-portal.sh).
+## 📂 Project Structure
 
-### manifest.json
-#### Project "Source of Truth" for version tracking and branch alignment.
+The repository is organized into the following key components:
 
-### symon-sync.sh
-#### Maintenance tool for submodule health and lock-file cleanup.
+- **`meta-symon/`**:  
+  Custom system orchestrator layer and Scarthgap migration templates.
 
-### symon-init-build-env
-#### Core environment wrapper for standardized pathing.
-________________
-🛠 Status & Roadmap
-* [x] Align submodules to Scarthgap (v2.8)
-* [x] Finalize environment initialization wrapper and portal
-* [ ] Extract Antminer FPGA bitstreams
-* [ ] Migrate meta-neural custom recipes for Scarthgap compatibility
-* [ ] Initial build verification on Alienware R11
+- **`scripts/`**:  
+  Tools for audit (`symon-audit.py`) and build management (`symon-portal.sh`).
+
+- **`manifest.json`**:  
+  The project's "Source of Truth" for version tracking and branch alignment.
+
+- **`symon-sync.sh`**:  
+  Workspace synchronization tool for submodule health and lock-file cleanup.
+
+- **`symon-init-build-env`**:  
+  Core environment wrapper for standardized paths.
+
+---
+
+## 🛠 Status & Roadmap
+
+The project is actively being developed with the following key milestones:
+
+- [ ] Align submodules to Scarthgap (v2.8)
+- [ ] Finalize environment initialization wrapper and portal
+- [ ] Extract Antminer FPGA bitstreams
+- [ ] Migrate `meta-neural` custom recipes for Scarthgap compatibility
+- [ ] Verify initial builds on Alienware R11
+
+---
+
+## 📖 License
+
+*(Insert your licensing policy here or leave this section if there’s no license yet.)*
+
+---
+
+### Contributions & Support
+
+Contributions are welcomed! Please submit your ideas, issues, or improvements via pull requests. For support, open an issue, and we’ll get back to you.
+
+---
+
+Let me know if this version meets your expectations or if you'd like to add anything further!
