@@ -1,18 +1,9 @@
-# POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
-# changes incompatibly
 POKY_BBLAYERS_CONF_VERSION = "2"
-
 BBPATH = "${TOPDIR}"
 BBFILES ?= ""
-
 BBLAYERS ?= " \
-  ##OEROOT##/sources/openembedded-core/meta \
-  ##OEROOT##/sources/meta-openembedded/meta-oe \
-  ##OEROOT##/sources/meta-openembedded/meta-python \
-  ##OEROOT##/sources/meta-openembedded/meta-networking \
-  ##OEROOT##/sources/meta-openembedded/meta-filesystems \
-  ##OEROOT##/sources/meta-clang \
-  ##OEROOT##/meta-symoneural-bsp \
+  ##OEROOT##/sources/poky/meta \
   ##OEROOT##/meta-neural \
   ##OEROOT##/meta-symon \
+  ##OEROOT##/meta-symoneural-bsp \
   "

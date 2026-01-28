@@ -1,0 +1,7 @@
+{
+    "project": "SyMoNeuRaL OS",
+    "codename": "symoneural-core",
+    "version": "1.0",
+    "target_branch": "scarthgap",
+    "custom_layers": ["meta-symon", "meta-neural", "meta-symoneural-bsp"]
+}
