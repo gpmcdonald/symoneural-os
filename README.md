@@ -1,7 +1,3 @@
-Here's a polished version of your README that improves the layout, enhances readability, and makes it look more professional:
-
----
-
 # SyMoNeuRaL OS: Scarthgap Migration Project
 
 **SyMoNeuRaL OS** is a Yocto-based system orchestrator designed for **high-performance computing (HPC)** and **embedded FPGA applications**. This project is currently undergoing migration to the **Scarthgap LTS (v2.8)** release.
