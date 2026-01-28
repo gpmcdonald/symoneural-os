@@ -1,25 +1,8 @@
-# SyMoNeuRaL Git Ignore
-# Build Directories
-build/
+# Build dirs
 symon-build/
 poky-build/
-
-# Yocto/BitBake Artifacts
-bitbake.lock
-pseudodone
-downloads/
-sstate-cache/
-tmp/
-sstate-report.txt
-
-# Configuration (Don't leak local paths)
-conf/local.conf
-conf/bblayers.conf
-conf/templateconf.cfg
-
-# System & Editor files
-*.pyc
-*.swp
-.Trash-1000/
-.vscode/
-.idea/
+build/
+*/build/
+*/tmp/
+*/sstate-cache/
+*.log
