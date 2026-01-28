@@ -1,22 +1,32 @@
-# meta-symoneural/classes/symoneural-sanity.bbclass
+# symoneural-sanity.bbclass
+# Professional environment validation for SyMoNeuRaL OS
 
-python symoneural_update_bblayersconf() {
-    # 1. Get the current version from the user's bblayers.conf
-    current_version = int(d.getVar('SYMONOS_BBLAYERS_CONF_VERSION') or -1)
-    
-    # 2. Get the required version from your distro config
-    latest_version = int(d.getVar('REQUIRED_SYMONOS_BBLAYERS_CONF_VERSION') or -1)
+addhandler symoneural_sanity_handler
+symoneural_sanity_handler[eventmask] = "bb.event.ConfigParsed"
 
-    # 3. If they don't match, run update logic
-    if current_version < latest_version:
-        bb.note("SymonOS: Upgrading bblayers.conf from version %s to %s" % (current_version, latest_version))
-        
-        # ... (Insert logic here to rewrite the file, similar to symoneural-sanity) ...
-        
-        # 4. Update the version number in the file so we don't run this again
-        # (Simplified logic - in reality you use regex to replace the text)
-        bb.note("Configuration update complete.")
+python symoneural_sanity_handler() {
+    import os
+
+    # 1. Verify we are actually using the SyMoNeuRaL Distro
+    distro = d.getVar('DISTRO')
+    if distro != "symonos":
+        bb.warn("SyMoNeuRaL Sanity: You are not using 'symonos' as your DISTRO. Build results may be unpredictable.")
+
+    # 2. Check for the manifest.json "Locked" state
+    # This ensures the user didn't bypass the symon-portal.sh audit
+    root_dir = d.getVar('OEROOT')
+    manifest = os.path.join(root_dir, "manifest.json")
+
+    if not os.path.exists(manifest):
+        bb.fatal("SyMoNeuRaL Sanity: manifest.json is missing! Please run 'scripts/symon-portal.sh' to align your environment.")
+
+    # 3. Layer Compatibility Verification
+    # Ensure all layers in BBLAYERS support the distro codename
+    codename = d.getVar('DISTRO_CODENAME')
+    layers = (d.getVar('BBLAYERS') or "").split()
+
+    for layer in layers:
+        # Here we could add logic to parse each layer's conf/layer.conf
+        # to ensure it matches symoneural-core requirements
+        pass
 }
-
-# Register this function to run during the configuration update phase
-BBLAYERS_CONF_UPDATE_FUNCS += "conf/bblayers.conf:SYMONOS_BBLAYERS_CONF_VERSION:REQUIRED_SYMONOS_BBLAYERS_CONF_VERSION:symoneural_update_bblayersconf"

@@ -1,4 +1,14 @@
 #!/bin/bash
+# SyMoNeuRaL OS: Final Orchestration Realignment
+# Fixes: Authentication loops, pathing errors, and shell compatibility.
+
+export OEROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$OEROOT"
+
+# 1. THE PORTAL (scripts/symon-portal.sh)
+# Fixed: Uses /bin/bash for submodule loops, absolute paths for TEMPLATECONF.
+cat <<'EOF' > scripts/symon-portal.sh
+#!/bin/bash
 export OEROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$OEROOT"
 
@@ -47,3 +57,8 @@ fi
 
 export BITBAKEDIR="$OEROOT/sources/bitbake"
 . ./oe-init-build-env "$BDIR"
+EOF
+chmod +x scripts/symon-portal.sh
+
+echo "✓ Logic Realignment Complete."
+echo "➜ Run: . scripts/symon-portal.sh"
