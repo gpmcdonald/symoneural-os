@@ -6,7 +6,7 @@
 # This tune is recommended for the Intel Core 2 CPU family, including Conroe,
 # Merom and beyond, as well as the first Atom CPUs, Diamondville, and beyond.
 #
-DEFAULTTUNE ?= "core2-32"
+DEFAULTTUNE ?= "symon-core2-32"
 
 # Include the previous tune to pull in PACKAGE_EXTRA_ARCHS
 require conf/machine/include/x86/tune-i686.inc
