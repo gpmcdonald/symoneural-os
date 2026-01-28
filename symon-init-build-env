@@ -1,21 +1,34 @@
 #!/bin/sh
+# symon-init-build-env
+
+if [ -z "$1" ]; then
+    echo "Usage: source ./symon-init-build-env <build-dir-name> (e.g., symon-build)"
+    return 1
+fi
+
 export OEROOT="$(pwd)"
 export BITBAKEDIR="$OEROOT/sources/bitbake"
 export PATH="$OEROOT/sources/openembedded-core/scripts:$BITBAKEDIR/bin:$PATH"
-export PAGER=cat
-export TERM=dumb
+export TEMPLATECONF="$OEROOT/.templateconf"  # Critical: use your templates
 
-# Fixed: Combined the source command and suppressed output properly
-. "$OEROOT/sources/openembedded-core/scripts/oe-buildenv-internal" > /dev/null 2>&1
-. "$OEROOT/sources/openembedded-core/scripts/oe-setup-builddir" "$@" > /dev/null 2>&1
+echo "→ OEROOT set to $OEROOT"
+echo "→ TEMPLATECONF set to $TEMPLATECONF"
+echo "→ Setting up build dir: $1"
 
+# No suppression - see real output for debugging
+. "$OEROOT/sources/openembedded-core/scripts/oe-buildenv-internal" || { echo "❌ oe-buildenv-internal failed"; return 1; }
+. "$OEROOT/sources/openembedded-core/scripts/oe-setup-builddir" "$1" || { echo "❌ oe-setup-builddir failed"; return 1; }
+
+# Handle info files (if generated)
 mkdir -p "$BUILDDIR/conf/.info"
 [ -f "$BUILDDIR/conf/conf-summary.txt" ] && mv "$BUILDDIR/conf/conf-summary.txt" "$BUILDDIR/conf/.info/"
 [ -f "$BUILDDIR/conf/conf-notes.txt" ] && mv "$BUILDDIR/conf/conf-notes.txt" "$BUILDDIR/conf/.info/"
-
-/bin/cat "$BUILDDIR/conf/.info/conf-summary.txt"
-/bin/cat "$BUILDDIR/conf/.info/conf-notes.txt"
+[ -s "$BUILDDIR/conf/.info/conf-summary.txt" ] && cat "$BUILDDIR/conf/.info/conf-summary.txt"
+[ -s "$BUILDDIR/conf/.info/conf-notes.txt" ] && cat "$BUILDDIR/conf/.info/conf-notes.txt"
 
 export TERM=xterm-256color
 unset PAGER
-cd "$BUILDDIR"
+
+cd "$BUILDDIR" || { echo "❌ Failed to cd into $BUILDDIR"; return 1; }
+echo "→ Build environment ready in $BUILDDIR"
+echo "  Run 'bitbake <target>' to start (e.g., bitbake core-image-minimal)"
