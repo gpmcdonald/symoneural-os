@@ -1,8 +1,27 @@
-# Build dirs
+# Yocto build artifacts
+build/
 symon-build/
 poky-build/
-build/
 */build/
 */tmp/
 */sstate-cache/
+*/cache/
 *.log
+*.bbclass~  # editor backups
+*.swp
+*.swo
+
+# Temporary / ignored files
+.DS_Store
+Thumbs.db
+*.bak
+*.orig
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Optional: ignore large FPGA bitstreams if you add them later
+*.bit
+*.bin
