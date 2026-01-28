@@ -7,7 +7,7 @@ set -e  # Exit on error
 PROJECT_ROOT="$(pwd)"
 echo " 󱁫 SyMoNeuRaL Maintenance: Syncing Workspace to Scarthgap..."
 
-# 0. Ensure we're in repo root (basic sanity)
+# 0. Sanity check
 if [ ! -f "manifest.json" ] || [ ! -d "sources" ]; then
     echo "❌ ERROR: Must run from repo root (where manifest.json and sources/ exist)"
     exit 1
@@ -28,7 +28,7 @@ for submodule in bitbake openembedded-core meta-openembedded poky meta-clang met
             echo "→ Switching $submodule to $YOCTO_BRANCH (was $current_branch)"
             git -C "$path" fetch origin
             git -C "$path" checkout "$YOCTO_BRANCH" || {
-                echo "⚠️  $submodule has no $YOCTO_BRANCH branch (using latest fetch)"
+                echo "⚠️ $submodule has no $YOCTO_BRANCH branch (using latest fetch)"
                 git -C "$path" checkout FETCH_HEAD
             }
             git -C "$path" pull --rebase origin "$YOCTO_BRANCH" || echo "  (pull skipped if detached)"
@@ -37,14 +37,13 @@ for submodule in bitbake openembedded-core meta-openembedded poky meta-clang met
             git -C "$path" pull --rebase origin "$YOCTO_BRANCH"
         fi
     else
-        echo "⚠️  $path not found — submodule missing?"
+        echo "⚠️ $path not found — submodule missing?"
     fi
 done
 
 # 2. Custom Layers from manifest.json
 echo "🔧 Syncing custom layers from manifest.json..."
 if command -v jq >/dev/null; then
-    # Use jq if available (nice-to-have; fallback below)
     jq -r '.layers[] | "\(.name) \(.branch)"' manifest.json | while read -r layer branch; do
         if [ -d "$layer" ]; then
             echo "→ Ensuring $layer on branch $branch"
@@ -53,7 +52,7 @@ if command -v jq >/dev/null; then
         fi
     done
 else
-    # Fallback: hardcode since manifest is small/static
+    # Fallback: hardcoded from manifest
     for layer_branch in "meta-neural:scarthgap" "meta-symon:main" "meta-symoneural-bsp:main"; do
         layer=${layer_branch%%:*}
         branch=${layer_branch#*:}
@@ -79,9 +78,6 @@ if [ ! -s ".templateconf" ]; then
     echo "TEMPLATECONF=\${TEMPLATECONF:-meta-symon/conf/templates/default}" > .templateconf
     echo "✓ Regenerated .templateconf"
 fi
-
-# Optional: pin specific commits if you want reproducibility later
-# git submodule status > .git-submodule-pins.txt
 
 # 5. Permission Sweep
 echo "🔐 Fixing script permissions..."
