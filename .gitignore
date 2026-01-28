@@ -8,4 +8,4 @@ sstate-cache/
 tmp/
 *.pyc
 *.swp
-.Trash*
+.Trash-1000/
