@@ -1,0 +1,5 @@
+# Sources
+
+- poky: https://git.yoctoproject.org/poky/?h=scarthgap
+- meta-arm: https://git.yoctoproject.org/meta-arm/?h=scarthgap
+- meta-yocto: https://git.yoctoproject.org/meta-yocto/?h=scarthgap
