@@ -2,7 +2,7 @@ SUMMARY = "SyMoNeuRaL OS Standalone Image"
 DESCRIPTION = "A fully independent image recipe for SyMoNeuRaL OS."
 LICENSE = "MIT"
 
-inherit symon-core-image
+inherit core-image
 
 IMAGE_FEATURES += " \
     splash \
