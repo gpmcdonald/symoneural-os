@@ -3,7 +3,7 @@ DESCRIPTION = "A minimalist base for SyMoNeuRaL embedded targets."
 LICENSE = "MIT"
 
 # Use the OE-Core standard minimal image as the foundation
-inherit core-image
+inherit classes-recipe/core-image
 
 # Core requirements for the 'Tiny' flavor
 IMAGE_INSTALL += " \
