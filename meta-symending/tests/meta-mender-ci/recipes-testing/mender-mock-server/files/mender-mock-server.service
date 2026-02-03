@@ -1,0 +1,14 @@
+[Unit]
+Description=Mender OTA mock server service
+After=systemd-resolved.service
+
+[Service]
+Type=idle
+User=root
+Group=root
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /usr/local/bin/mender-mock-server.py
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
