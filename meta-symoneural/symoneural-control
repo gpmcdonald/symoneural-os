@@ -1,0 +1,245 @@
+#!/bin/bash
+
+# --- CONFIGURATION ---
+export SYMO_ROOT="/var/yocto/symoneural"
+export BUILD_DIR="$SYMO_ROOT/build"
+export LAYERS_DIR="$SYMO_ROOT/layers"
+export API_URL="https://layers.openembedded.org/layerindex/api"
+
+# Default Paths (User can change these in the First Run Wizard)
+DEFAULT_DL_DIR="/var/yocto/downloads"
+DEFAULT_SSTATE_DIR="/var/yocto/sstate-cache"
+
+# Ensure base exists
+mkdir -p $BUILD_DIR/conf $LAYERS_DIR
+
+# --- GUI HELPERS (Whiptail) ---
+
+msg_box() {
+    whiptail --title "Symoneural Control" --msgbox "$1" 10 60
+}
+
+input_box() {
+    # $1=Title, $2=Prompt, $3=DefaultValue, $4=OutputVariable
+    RESULT=$(whiptail --title "$1" --inputbox "$2" 10 60 "$3" 3>&1 1>&2 2>&3)
+    eval $4="'$RESULT'"
+}
+
+# --- GENERATORS ---
+
+generate_settings_conf() {
+    # Based on local.conf.extended - The "Kitchen Sink" of options
+    cat <<EOF > $BUILD_DIR/conf/settings.conf
+# ==============================================================================
+# SYMONEURAL SETTINGS (Based on local.conf.extended)
+# ==============================================================================
+# This file contains the "Power User" settings. Uncomment to enable.
+
+# --- PARALLELISM ---
+# BB_NUMBER_THREADS ?= "\${@oe.utils.cpu_count()}"
+# PARALLEL_MAKE ?= "-j \${@oe.utils.cpu_count()}"
+
+# --- DISK SPACE MONITOR (Default: Enabled) ---
+BB_DISKMON_DIRS ??= "\\
+    STOPTASKS,\${TMPDIR},1G,100K \\
+    STOPTASKS,\${DL_DIR},1G,100K \\
+    STOPTASKS,\${SSTATE_DIR},1G,100K \\
+    ABORT,\${TMPDIR},100M,1K \\
+    ABORT,\${DL_DIR},100M,1K \\
+    ABORT,\${SSTATE_DIR},100M,1K"
+
+# --- PACKAGE MANAGEMENT ---
+# PACKAGE_CLASSES ?= "package_rpm"
+# EXTRA_IMAGE_FEATURES += "package-management"
+
+# --- IMAGE FEATURES ---
+# EXTRA_IMAGE_FEATURES += "debug-tweaks"
+# EXTRA_IMAGE_FEATURES += "tools-debug"
+# EXTRA_IMAGE_FEATURES += "tools-profile"
+# EXTRA_IMAGE_FEATURES += "ssh-server-openssh"
+
+# --- ARCHIVING (Source Mirroring) ---
+# INHERIT += "archiver"
+# ARCHIVER_MODE[src] = "original"
+
+# --- HASH EQUIVALENCE (Speed up builds) ---
+# BB_HASHSERVE = "auto"
+# BB_SIGNATURE_HANDLER = "OEEquivHash"
+
+# --- QEMU CONFIGURATION ---
+# PACKAGECONFIG:append:pn-qemu-system-native = " sdl"
+EOF
+}
+
+generate_kernel_conf() {
+    cat <<EOF > $BUILD_DIR/conf/kernel.conf
+# ==============================================================================
+# SYMONEURAL KERNEL CONFIGURATION
+# ==============================================================================
+
+# --- PREFERRED PROVIDERS ---
+# PREFERRED_PROVIDER_virtual/kernel ?= "linux-yocto"
+# PREFERRED_VERSION_linux-yocto ?= "6.6%"
+
+# --- KERNEL ARTIFACTS ---
+# KERNEL_IMAGETYPE ?= "Image"
+# KERNEL_DEVICETREE ?= "broadcom/bcm2711-rpi-4-b.dtb"
+
+# --- BOOT ARGUMENTS ---
+# KERNEL_EXTRA_ARGS ?= "console=ttyS0,115200 root=/dev/mmcblk0p2"
+
+# --- MODULES ---
+# KERNEL_MODULE_AUTOLOAD += "uio_pdrv_genirq"
+EOF
+}
+
+first_run_wizard() {
+    if [ ! -f "$BUILD_DIR/conf/site.conf" ]; then
+        whiptail --title "Symoneural First Run" --msgbox "Welcome to Symoneural Control Center.\n\nWe need to configure your base directories before starting." 12 60
+
+        # 1. Ask for DL_DIR
+        input_box "Configuration" "Where should Downloads be stored?" "$DEFAULT_DL_DIR" USER_DL_DIR
+        if [ -z "$USER_DL_DIR" ]; then USER_DL_DIR="$DEFAULT_DL_DIR"; fi
+
+        # 2. Ask for SSTATE_DIR
+        input_box "Configuration" "Where should SState Cache be stored?" "$DEFAULT_SSTATE_DIR" USER_SSTATE_DIR
+        if [ -z "$USER_SSTATE_DIR" ]; then USER_SSTATE_DIR="$DEFAULT_SSTATE_DIR"; fi
+
+        # 3. Generate site.conf
+        echo "Generating site.conf..."
+        cat <<EOF > $BUILD_DIR/conf/site.conf
+# Symoneural Site Config
+SSTATE_DIR = "$USER_SSTATE_DIR"
+DL_DIR = "$USER_DL_DIR"
+EOF
+    fi
+
+    # Generate other files if missing
+    if [ ! -f "$BUILD_DIR/conf/settings.conf" ]; then generate_settings_conf; fi
+    if [ ! -f "$BUILD_DIR/conf/kernel.conf" ]; then generate_kernel_conf; fi
+
+    if [ ! -f "$BUILD_DIR/conf/bblayers.conf" ]; then
+        cat <<EOF > $BUILD_DIR/conf/bblayers.conf
+LCONF_VERSION = "7"
+BBPATH = "\${TOPDIR}"
+BBFILES ?= ""
+BBLAYERS ?= " $LAYERS_DIR/openembedded-core/meta "
+EOF
+    fi
+
+    if [ ! -f "$BUILD_DIR/conf/local.conf" ]; then
+        cat <<EOF > $BUILD_DIR/conf/local.conf
+require settings.conf
+require kernel.conf
+BBMULTICONFIG ?= ""
+EOF
+    fi
+}
+
+# --- API FUNCTIONS ---
+
+search_api() {
+    TERM=$(whiptail --title "Search Layers" --inputbox "Enter search term (e.g. arm, xilinx, qt5):" 10 60 3>&1 1>&2 2>&3)
+    if [ -z "$TERM" ]; then return; fi
+
+    # Python Search
+    python3 -c "
+import urllib.request, json
+try:
+    url = '${API_URL}/layerItems/?name__icontains=${TERM}'
+    with urllib.request.urlopen(url) as r:
+        data = json.loads(r.read().decode())
+        for l in data:
+            print(f\"{l['name']} | {l['vcs_url']}\")
+except: pass
+" > /tmp/results
+
+    # Transform for Whiptail
+    # We need to build a list of arguments: TAG ITEM TAG ITEM...
+    OPTIONS=()
+    while IFS= read -r line; do
+        NAME=$(echo "$line" | awk -F ' | ' '{print $1}')
+        URL=$(echo "$line" | awk -F '|' '{print $2}' | xargs)
+        OPTIONS+=("$NAME" "$URL")
+    done < /tmp/results
+
+    if [ ${#OPTIONS[@]} -eq 0 ]; then
+        msg_box "No results found."
+        return
+    fi
+
+    # Show Menu
+    CHOICE=$(whiptail --title "Select Layer to Install" --menu "Choose a layer:" 20 78 10 "${OPTIONS[@]}" 3>&1 1>&2 2>&3)
+
+    if [ -n "$CHOICE" ]; then
+        # Find URL for choice
+        URL=$(grep "^$CHOICE |" /tmp/results | awk -F '|' '{print $2}' | xargs)
+
+        clear
+        echo "Cloning $CHOICE..."
+        if [ ! -d "$LAYERS_DIR/$CHOICE" ]; then
+            git clone -b master "$URL" "$LAYERS_DIR/$CHOICE"
+        else
+            echo "Layer already exists."
+        fi
+
+        echo "Registering Layer..."
+        source $LAYERS_DIR/openembedded-core/oe-init-build-env $BUILD_DIR > /dev/null
+        bitbake-layers add-layer "$LAYERS_DIR/$CHOICE"
+
+        msg_box "Layer $CHOICE installed and added to bblayers.conf!"
+    fi
+}
+
+setup_multiconfig() {
+    DISTRO=$(whiptail --title "New Build Target" --inputbox "Distro Name (e.g. poky, nodistro):" 10 60 3>&1 1>&2 2>&3)
+    MACHINE=$(whiptail --title "New Build Target" --inputbox "Machine Name (e.g. qemux86-64):" 10 60 3>&1 1>&2 2>&3)
+
+    if [ -n "$DISTRO" ] && [ -n "$MACHINE" ]; then
+        CFG_NAME="${DISTRO}-${MACHINE}"
+        mkdir -p $BUILD_DIR/conf/multiconfig
+
+        echo "DISTRO = \"$DISTRO\"" > $BUILD_DIR/conf/multiconfig/${CFG_NAME}.conf
+        echo "MACHINE = \"$MACHINE\"" >> $BUILD_DIR/conf/multiconfig/${CFG_NAME}.conf
+        echo "TMPDIR = \"\${TOPDIR}/tmp-${CFG_NAME}\"" >> $BUILD_DIR/conf/multiconfig/${CFG_NAME}.conf
+
+        if ! grep -q "$CFG_NAME" $BUILD_DIR/conf/local.conf; then
+           echo "BBMULTICONFIG += \"$CFG_NAME\"" >> $BUILD_DIR/conf/local.conf
+        fi
+        msg_box "Created Configuration: mc:${CFG_NAME}"
+    fi
+}
+
+# --- MAIN LOOP ---
+
+# 1. Run Wizard
+first_run_wizard
+
+# 2. Menu Loop
+while true; do
+    CHOICE=$(whiptail --title "Symoneural Control Center" --menu "Select an option:" 20 70 10 \
+    "1" "Search API & Install Layer" \
+    "2" "Create/Add Build Target" \
+    "3" "Edit Settings (settings.conf)" \
+    "4" "Edit Kernel (kernel.conf)" \
+    "5" "List Active Layers" \
+    "6" "ENTER BUILD SHELL" 3>&1 1>&2 2>&3)
+
+    case $CHOICE in
+        1) search_api ;;
+        2) setup_multiconfig ;;
+        3) ${EDITOR:-nano} $BUILD_DIR/conf/settings.conf ;;
+        4) ${EDITOR:-nano} $BUILD_DIR/conf/kernel.conf ;;
+        5) cat $BUILD_DIR/conf/bblayers.conf | whiptail --title "Active Layers" --textbox /dev/stdin 20 70 ;;
+        6)
+           clear
+           echo " Entering Yocto Environment..."
+           cd $SYMO_ROOT
+           # We print the command for the user to copy/paste if the shell spawn is weird,
+           # or we just exec bash with the environment.
+           bash --rcfile <(echo ". $LAYERS_DIR/openembedded-core/oe-init-build-env $BUILD_DIR")
+           break
+           ;;
+        *) break ;;
+    esac
+done
