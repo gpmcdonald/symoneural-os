@@ -1,0 +1,536 @@
+#!/bin/bash
+set -euo pipefail
+
+# ============================================================
+# Debian 13 (Trixie) — Dev-Ready Bootstrap + NVIDIA r590 Open DKMS + KDE/SDDM/X11
+# + VS Code repo/install
+# + Xilinx Vivado/Vitis/PetaLinux deps (heavy)
+# + API backend + web frontend deps (common)
+# + OpenSSH Server (port 22222)
+# + XRDP (port 28673)
+#
+# Secure Boot: prepares MOK import + pauses before reboot (press Enter)
+# ============================================================
+
+# ============================================================
+# STEP 0 — Become root
+# ============================================================
+if [[ "${EUID}" -ne 0 ]]; then
+  exec sudo -i bash -c "cd '$(pwd)'; bash '$0' ${*:-}"
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+# ============================================================
+# STEP 0A — Config toggles (edit if you want)
+# ============================================================
+ENABLE_I386="yes"               # yes/no
+INSTALL_KDE_SDDM="yes"          # yes/no
+INSTALL_NVIDIA_OPEN="yes"       # yes/no
+INSTALL_YOCTO_DEPS="yes"        # yes/no
+INSTALL_PYTHON_DEVS="yes"       # yes/no
+INSTALL_VSCODE="yes"            # yes/no
+INSTALL_WEB_STACK="yes"         # yes/no (node/php/sqlite)
+INSTALL_XRDP="yes"              # yes/no
+CONFIGURE_SSH="yes"             # yes/no
+INSTALL_XILINX_DEPS="yes"       # yes/no (Vivado/Vitis/PetaLinux deps)
+SETUP_SYMONEURAL_SCAFFOLD="no"  # yes/no
+
+SSH_PORT="22222"
+XRDP_PORT="28673"
+
+# ============================================================
+# STEP 0B — Resolve target user (the real login user)
+# ============================================================
+TARGET_USER="${SUDO_USER:-}"
+if [[ -z "${TARGET_USER}" || "${TARGET_USER}" == "root" ]]; then
+  TARGET_USER="$(logname 2>/dev/null || true)"
+fi
+echo "TARGET_USER=${TARGET_USER:-<none>}"
+
+# Preferred package manager
+apt update
+apt -y full-upgrade
+apt install -y nala || true
+PM="apt"
+command -v nala >/dev/null 2>&1 && PM="nala"
+
+# ============================================================
+# STEP 1 — Enable contrib + non-free + non-free-firmware
+# ============================================================
+sed -i 's/ main$/ main contrib non-free non-free-firmware/g' /etc/apt/sources.list || true
+apt update
+
+# ============================================================
+# STEP 2 — Base tooling (things we keep using)
+# ============================================================
+$PM install -y \
+  ca-certificates \
+  curl \
+  wget \
+  gnupg \
+  apt-transport-https \
+  software-properties-common \
+  git \
+  rsync \
+  unzip \
+  zip \
+  p7zip-full \
+  jq \
+  tmux \
+  htop \
+  nano \
+  vim \
+  pciutils \
+  usbutils \
+  lsb-release \
+  net-tools \
+  dnsutils \
+  iproute2 \
+  traceroute \
+  tree \
+  file
+
+# ============================================================
+# STEP 3 — Secure Boot / MOK tooling
+# ============================================================
+$PM install -y mokutil shim-signed sbsigntool
+mokutil --sb-state || true
+
+# ============================================================
+# STEP 4 — Kernel headers + DKMS toolchain
+# ============================================================
+$PM install -y \
+  linux-headers-$(uname -r) \
+  build-essential \
+  dkms \
+  pkg-config \
+  cmake \
+  ninja-build \
+  clang \
+  llvm
+
+# ============================================================
+# STEP 5 — i386 (Steam/32-bit libs) (optional)
+# ============================================================
+if [[ "${ENABLE_I386}" == "yes" ]]; then
+  dpkg --add-architecture i386 || true
+  apt update
+fi
+
+# ============================================================
+# STEP 6 — X11 stack (explicit)
+# ============================================================
+$PM install -y \
+  xorg \
+  xserver-xorg-core \
+  xserver-xorg-video-all \
+  xserver-xorg-input-all \
+  xinit \
+  x11-xserver-utils \
+  mesa-utils \
+  mesa-utils-extra \
+  libglvnd-dev \
+  libegl1-mesa-dev \
+  libx11-dev \
+  libxrandr-dev \
+  libxinerama-dev \
+  libxcursor-dev \
+  libxi-dev
+
+# ============================================================
+# STEP 7 — KDE Plasma + SDDM (X11 ensured) (optional)
+# ============================================================
+if [[ "${INSTALL_KDE_SDDM}" == "yes" ]]; then
+  $PM install -y \
+    kde-plasma-desktop \
+    plasma-workspace \
+    plasma-workspace-x11 \
+    sddm \
+    sddm-theme-breeze
+  systemctl enable sddm
+  systemctl set-default graphical.target
+fi
+
+# ============================================================
+# STEP 8 — User group permissions (GPU / DRM / desktop)
+# ============================================================
+if [[ -n "${TARGET_USER:-}" && "${TARGET_USER}" != "root" ]]; then
+  getent group render >/dev/null 2>&1 || groupadd render || true
+  getent group video  >/dev/null 2>&1 || groupadd video  || true
+  getent group input  >/dev/null 2>&1 || groupadd input  || true
+  usermod -aG video,render,input "${TARGET_USER}"
+  echo "Added ${TARGET_USER} to groups: video, render, input"
+else
+  echo "No non-root TARGET_USER detected; skipping usermod."
+fi
+
+# ============================================================
+# STEP 9 — Python dev stack (optional)
+# ============================================================
+if [[ "${INSTALL_PYTHON_DEVS}" == "yes" ]]; then
+  $PM install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    pipx
+  if [[ -n "${TARGET_USER:-}" && "${TARGET_USER}" != "root" ]]; then
+    sudo -u "${TARGET_USER}" -H bash -lc "pipx ensurepath" || true
+  fi
+fi
+
+# ============================================================
+# STEP 10 — Web/API backend + frontend deps (common) (optional)
+# ============================================================
+if [[ "${INSTALL_WEB_STACK}" == "yes" ]]; then
+  # Node + npm for modern frontends (Debian repo versions are fine for most work)
+  $PM install -y nodejs npm || true
+
+  # PHP + SQLite (useful for lightweight APIs/dashboards)
+  $PM install -y php php-cli php-fpm php-sqlite3 sqlite3 || true
+
+  # Common web/tooling helpers
+  $PM install -y \
+    nginx \
+    redis-server \
+    postgresql-client \
+    ripgrep \
+    fd-find || true
+fi
+
+# ============================================================
+# STEP 11 — VS Code repo + install (optional)
+# ============================================================
+if [[ "${INSTALL_VSCODE}" == "yes" ]]; then
+  # Microsoft key + repo for Debian
+  install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+    | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+
+  chmod 0644 /etc/apt/keyrings/microsoft.gpg
+
+  # Use stable channel
+  echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
+    > /etc/apt/sources.list.d/vscode.list
+
+  apt update
+  $PM install -y code
+fi
+
+# ============================================================
+# STEP 12 — Xilinx Vivado/Vitis/PetaLinux dependencies (optional, heavy)
+# Notes:
+# - Debian 13 packages differ from Ubuntu docs; this covers the usual runtime/build deps.
+# - If something is missing, the Xilinx installer will complain with the exact library name.
+# ============================================================
+if [[ "${INSTALL_XILINX_DEPS}" == "yes" ]]; then
+  $PM install -y \
+    gawk \
+    make \
+    gcc \
+    g++ \
+    bc \
+    bison \
+    flex \
+    texinfo \
+    diffstat \
+    chrpath \
+    socat \
+    cpio \
+    xz-utils \
+    zstd \
+    lz4 \
+    debianutils \
+    iputils-ping \
+    python3 \
+    python3-pexpect \
+    python3-jinja2 \
+    python3-pip \
+    python3-venv \
+    libssl-dev \
+    libtool \
+    automake \
+    autoconf \
+    libncurses5-dev \
+    libncursesw5-dev \
+    zlib1g-dev \
+    libglib2.0-0 \
+    libsm6 \
+    libice6 \
+    libxrender1 \
+    libxext6 \
+    libx11-6 \
+    libxtst6 \
+    libxi6 \
+    libxft2 \
+    libxss1 \
+    libfontconfig1 \
+    libfreetype6 \
+    libgtk2.0-0 \
+    libgtk2.0-dev \
+    libstdc++6 \
+    perl \
+    perl-modules \
+    tofrodos \
+    dos2unix \
+    gzip \
+    tar \
+    screen \
+    expect \
+    rsync \
+    kmod
+
+  # 32-bit libs often needed for some Xilinx tools/components
+  if [[ "${ENABLE_I386}" == "yes" ]]; then
+    $PM install -y \
+      libc6:i386 \
+      libstdc++6:i386 \
+      zlib1g:i386 \
+      libncurses5:i386 \
+      libtinfo6:i386 \
+      libuuid1:i386 || true
+  fi
+
+  # Some older installers still request libtinfo5; try (won’t fail build if absent)
+  $PM install -y libtinfo5 || true
+fi
+
+# ============================================================
+# STEP 13 — Yocto / OpenEmbedded build dependencies (optional, heavy)
+# ============================================================
+if [[ "${INSTALL_YOCTO_DEPS}" == "yes" ]]; then
+  $PM install -y \
+    gawk \
+    wget \
+    git \
+    diffstat \
+    unzip \
+    texinfo \
+    gcc \
+    build-essential \
+    chrpath \
+    socat \
+    cpio \
+    python3 \
+    python3-pip \
+    python3-pexpect \
+    xz-utils \
+    debianutils \
+    iputils-ping \
+    python3-git \
+    python3-jinja2 \
+    libegl1-mesa \
+    libsdl1.2-dev \
+    pylint \
+    xterm \
+    bzip2 \
+    file \
+    locales \
+    liblz4-tool \
+    gperf \
+    libxml2-utils \
+    xsltproc
+
+  sed -i 's/^# *\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen || true
+  locale-gen || true
+  update-locale LANG=en_US.UTF-8 || true
+fi
+
+# ============================================================
+# STEP 14 — OpenSSH Server install + port 22222 (optional)
+# ============================================================
+if [[ "${CONFIGURE_SSH}" == "yes" ]]; then
+  $PM install -y openssh-server
+
+  # Ensure the sshd config has our port (idempotent)
+  SSHD_CFG="/etc/ssh/sshd_config"
+  if grep -qE '^\s*#?\s*Port\s+' "${SSHD_CFG}"; then
+    sed -i "s/^\s*#\?\s*Port\s\+.*/Port ${SSH_PORT}/" "${SSHD_CFG}"
+  else
+    echo "Port ${SSH_PORT}" >> "${SSHD_CFG}"
+  fi
+
+  # Make sure it is enabled/running
+  systemctl enable ssh
+  systemctl restart ssh
+fi
+
+# ============================================================
+# STEP 15 — XRDP install + port 28673 (optional)
+# ============================================================
+if [[ "${INSTALL_XRDP}" == "yes" ]]; then
+  $PM install -y xrdp xorgxrdp
+
+  XRDP_INI="/etc/xrdp/xrdp.ini"
+  # Set listen port in [Globals] section: port=####
+  if grep -qE '^\s*port=' "${XRDP_INI}"; then
+    sed -i "s/^\s*port=.*/port=${XRDP_PORT}/" "${XRDP_INI}"
+  else
+    # Insert under [Globals] if possible, else append
+    if grep -q '^\[Globals\]' "${XRDP_INI}"; then
+      awk -v p="port=${XRDP_PORT}" '
+        BEGIN{done=0}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        /^\[Globals\]/{print; next}
+        {print}
+      ' "${XRDP_INI}" > /tmp/xrdp.ini.tmp || true
+      # Safer simple append if awk temp didn’t happen
+      if [[ -s /tmp/xrdp.ini.tmp ]]; then
+        mv /tmp/xrdp.ini.tmp "${XRDP_INI}"
+        echo "port=${XRDP_PORT}" >> "${XRDP_INI}"
+      else
+        echo "port=${XRDP_PORT}" >> "${XRDP_INI}"
+      fi
+    else
+      echo "port=${XRDP_PORT}" >> "${XRDP_INI}"
+    fi
+  fi
+
+  systemctl enable xrdp
+  systemctl restart xrdp
+fi
+
+# ============================================================
+# STEP 16 — NVIDIA repo enablement (cuda-keyring) + install OPEN DKMS stack
+# ============================================================
+if [[ "${INSTALL_NVIDIA_OPEN}" == "yes" ]]; then
+  wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb
+  dpkg -i cuda-keyring_1.1-1_all.deb
+  apt update
+
+  # Fallback (manual repo enablement) if keyring didn’t activate sources
+  if ! apt-cache policy | grep -q 'developer.download.nvidia.com/compute/cuda/repos/debian13'; then
+    wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-archive-keyring.gpg
+    mv cuda-archive-keyring.gpg /usr/share/keyrings/cuda-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/ /" \
+      | tee /etc/apt/sources.list.d/cuda-debian13-amd64.list
+    apt update
+  fi
+
+  $PM install -y nvidia-driver-assistant || true
+  command -v nvidia-driver-assistant >/dev/null 2>&1 && nvidia-driver-assistant || true
+
+  $PM install -y \
+    nvidia-open \
+    nvidia-kernel-open-dkms \
+    nvidia-modprobe \
+    nvidia-persistenced \
+    nvidia-settings \
+    nvidia-smi
+
+  if [[ "${ENABLE_I386}" == "yes" ]]; then
+    $PM install -y nvidia-driver-libs:i386 || true
+  fi
+
+  dkms autoinstall || true
+  update-initramfs -u || true
+
+  mokutil --sb-state || true
+  mokutil --list-new || true
+  mokutil --import /var/lib/dkms/mok.pub
+
+  echo
+  echo "MOK PASSWORD PROMPTED ABOVE (required)."
+  echo "REBOOT → 'Enroll MOK' → Continue → Yes → enter password → reboot."
+  echo
+fi
+
+# ============================================================
+# STEP 17 — Advanced / optional (commented out)
+# ============================================================
+
+# ---- Version locking (pinning packages) ----
+# apt install -y nvidia-driver-pinning-590
+# apt dist-upgrade --autoremove
+
+# ---- Proprietary drivers (cuda-drivers) ----
+# apt install -y cuda-drivers
+# apt install -y nvidia-driver-cuda nvidia-kernel-dkms
+
+# ---- Switching between OPEN ↔ PROPRIETARY ----
+# apt install --autoremove --purge nvidia-open
+# apt install --autoremove --purge cuda-drivers
+
+# ---- Full NVIDIA/CUDA Removal (big hammer) ----
+# (kept as reference; not run)
+
+# ============================================================
+# STEP 18 — SyMoNeuRaL scaffold (optional)
+# ============================================================
+if [[ "${SETUP_SYMONEURAL_SCAFFOLD}" == "yes" ]]; then
+  if [[ -n "${TARGET_USER:-}" && "${TARGET_USER}" != "root" ]]; then
+    USER_HOME="$(getent passwd "${TARGET_USER}" | cut -d: -f6)"
+  else
+    USER_HOME="/root"
+  fi
+  BASE_DIR="${USER_HOME}/SyMoNeuRaL"
+  mkdir -p "${BASE_DIR}"/{repos,venvs,logs,tools,downloads,docs,yocto}
+  if [[ -n "${TARGET_USER:-}" && "${TARGET_USER}" != "root" ]]; then
+    chown -R "${TARGET_USER}:${TARGET_USER}" "${BASE_DIR}" || true
+  fi
+fi
+
+# ============================================================
+# STEP 19 — Post-reboot verification helper
+# ============================================================
+cat >/root/dev_ready_post_reboot_check.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
+echo "=== Secure Boot ==="
+mokutil --sb-state || true
+echo
+echo "=== SSH listening ==="
+ss -lntp | egrep -i 'sshd|:' || true
+echo
+echo "=== XRDP listening ==="
+ss -lntp | egrep -i 'xrdp|:' || true
+echo
+echo "=== User groups (video/render) ==="
+id || true
+echo
+echo "=== DRM devices ==="
+ls -l /dev/dri || true
+echo
+echo "=== NVIDIA device nodes ==="
+ls -l /dev/nvidia* || true
+echo
+echo "=== nvidia-smi ==="
+nvidia-smi || true
+echo
+echo "=== DKMS status ==="
+dkms status | grep -i nvidia || true
+echo
+echo "=== Loaded modules ==="
+lsmod | grep -i nvidia || true
+echo
+echo "=== Recent dmesg (nvidia/secure boot/mok) ==="
+dmesg | egrep -i 'nvidia|secure boot|mok' | tail -n 200 || true
+EOF
+chmod +x /root/dev_ready_post_reboot_check.sh
+
+# ============================================================
+# STEP 20 — Pause + reboot for MOK enrollment
+# ============================================================
+echo
+echo "READY."
+echo "After reboot + MOK enroll, run: sudo /root/dev_ready_post_reboot_check.sh"
+echo
+read -p "Press ENTER to reboot and enroll MOK..." || true
+reboot

@@ -1,0 +1,715 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================
+# Debian 13 (Trixie) — Dev-Ready Bootstrap (INTERACTIVE, SAFE)
+# Key goals:
+#  - NEVER assume a package exists: every package is verified via apt-cache/policy first
+#  - If missing: offer replacements discovered from APT cache
+#  - If deps are broken: offer dpkg --configure -a + apt-get -f install + install deps (verified)
+#  - Continue on failures; write a log; summarize failures at the end
+#
+# Includes:
+#  - fastfetch + baseline system info
+#  - optional dpkg/apt repair
+#  - optional update/full-upgrade
+#  - enable contrib/non-free/non-free-firmware (robust, no dupes)
+#  - base dev tooling
+#  - optional i386 multiarch
+#  - explicit X11 stack
+#  - optional KDE Plasma + SDDM (X11 ensured) (chooses best available meta)
+#  - optional Terminus console fonts (console-setup based)
+#  - optional VS Code repo/install
+#  - optional web stack
+#  - optional Yocto deps
+#  - optional Xilinx deps (uses ncurses-dev to avoid ncurses5-dev mismatch)
+#  - optional OpenSSH (choose port)
+#  - optional XRDP (choose port)
+#  - optional NVIDIA purge, repo enablement, Open DKMS install + MOK import, pause before reboot
+#
+# Notes:
+#  - This script avoids nala --reinstall (it doesn't exist).
+#  - Logging is done once via tee; run_step does NOT double-redirect.
+#  - APT simulation output is stored in a temp file and cleaned up on exit.
+# ============================================================
+
+# -------------------------------
+# Globals
+# -------------------------------
+TS="$(date +%Y%m%d-%H%M%S)"
+LOG="/var/log/symon_deb13_devready_${TS}.log"
+FAILURES=()
+
+# Colors
+RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; BLUE=$'\033[0;34m'; RC=$'\033[0m'
+
+say()  { echo "${BLUE}[*]${RC} $*"; }
+ok()   { echo "${GREEN}[OK]${RC} $*"; }
+warn() { echo "${YELLOW}[WARN]${RC} $*"; }
+bad()  { echo "${RED}[FAIL]${RC} $*"; }
+log_line() { echo "[$(date -Is)] $*" >>"$LOG"; }
+
+run_step() {
+  local name="$1"; shift
+  echo; say "$name"
+  log_line "STEP: $name"
+  log_line "CMD: $*"
+  if "$@"; then
+    ok "$name"
+    log_line "RESULT: OK"
+    return 0
+  else
+    bad "$name (see log: $LOG)"
+    log_line "RESULT: FAIL"
+    FAILURES+=("$name")
+    return 1
+  fi
+}
+run_step_allow_fail() { run_step "$@" || true; }
+
+# -------------------------------
+# Prompts
+# -------------------------------
+ask_yn() {
+  local prompt="$1"; local def="${2:-yes}"
+  local dshow="[y/N]"; [[ "$def" == "yes" ]] && dshow="[Y/n]"
+  while true; do
+    read -r -p "${prompt} ${dshow}: " ans || true
+    ans="${ans:-}"
+    if [[ -z "$ans" ]]; then [[ "$def" == "yes" ]] && return 0 || return 1; fi
+    case "$ans" in y|Y|yes|YES) return 0 ;; n|N|no|NO) return 1 ;; *) echo "Please answer y or n." ;; esac
+  done
+}
+
+ask_val() {
+  local prompt="$1"; local def="${2:-}"; local ans
+  if [[ -n "$def" ]]; then
+    read -r -p "${prompt} [${def}]: " ans || true
+    ans="${ans:-$def}"
+  else
+    read -r -p "${prompt}: " ans || true
+  fi
+  echo "$ans"
+}
+
+# -------------------------------
+# Re-exec as root (early, safe)
+# -------------------------------
+ensure_root() {
+  if [[ "${EUID}" -eq 0 ]]; then return 0; fi
+  echo; say "This script needs sudo; you'll be prompted for your password."
+  sudo -v
+  exec sudo -E bash "$0" "$@"
+}
+
+# ============================================================
+# Package resolution + fallbacks (Debian 13 safe)
+# ============================================================
+declare -A PKG_FALLBACKS=(
+  # system info
+  [fastfetch]="fastfetch neofetch"
+  # misc tools
+  [fd-find]="fd-find"
+  [ripgrep]="ripgrep"
+  # php fpm naming
+  [php-fpm]="php-fpm php8.3-fpm php8.2-fpm php8.4-fpm"
+  # terminus
+  [fonts-terminus]="fonts-terminus"
+  # NVIDIA (names differ across repos)
+  [nvidia-open]="nvidia-open"
+  [nvidia-kernel-open-dkms]="nvidia-kernel-open-dkms"
+  [nvidia-driver-assistant]="nvidia-driver-assistant"
+  # KDE/Plasma meta choices
+  [kde-plasma-desktop]="kde-plasma-desktop kde-standard plasma-desktop"
+  [plasma-workspace-x11]="plasma-workspace-x11"
+  [sddm]="sddm"
+  # XRDP
+  [xorgxrdp]="xorgxrdp"
+  # Xilinx: ncurses5-dev often missing on newer Debian
+  [libncurses5-dev]="libncurses-dev libncurses6 libncursesw6 libncursesw6-dev"
+  [libtinfo5]="libtinfo6 libtinfo5"
+  # Yocto: libsdl1.2-dev often missing
+  [libsdl1.2-dev]="libsdl1.2-dev libsdl2-dev"
+)
+
+# stronger existence check (avoids false negatives)
+pkg_exists() {
+  apt-cache show "$1" >/dev/null 2>&1 || apt-cache policy "$1" 2>/dev/null | grep -qE 'Candidate:\s*(?!\(none\))'
+}
+
+list_candidates_from_cache() {
+  local term="$1"
+  apt-cache search --names-only "$term" 2>/dev/null | awk '{print $1}' | head -n 30
+}
+
+offer_replacement() {
+  local missing="$1"
+  local choices=()
+
+  if [[ -n "${PKG_FALLBACKS[$missing]:-}" ]]; then
+    # shellcheck disable=SC2206
+    local arr=( ${PKG_FALLBACKS[$missing]} )
+    for c in "${arr[@]}"; do pkg_exists "$c" && choices+=("$c"); done
+  fi
+
+  if (( ${#choices[@]} == 0 )); then
+    while IFS= read -r c; do [[ -n "$c" ]] && choices+=("$c"); done < <(list_candidates_from_cache "$missing")
+  fi
+
+  if (( ${#choices[@]} > 1 )); then
+    mapfile -t choices < <(printf "%s\n" "${choices[@]}" | awk '!seen[$0]++')
+  fi
+
+  if (( ${#choices[@]} == 0 )); then
+    warn "No replacement candidates found for: $missing"
+    return 1
+  fi
+
+  echo
+  echo "Package not found: $missing"
+  echo "Choose a replacement:"
+  local i=1
+  for c in "${choices[@]}"; do echo "  $i) $c"; i=$((i+1)); done
+  echo "  0) Skip"
+  local sel
+  while true; do
+    sel="$(ask_val "Select" "1")"
+    [[ "$sel" =~ ^[0-9]+$ ]] || { echo "Invalid."; continue; }
+    (( sel == 0 )) && return 2
+    if (( sel >= 1 && sel <= ${#choices[@]} )); then
+      echo "${choices[$((sel-1))]}"
+      return 0
+    fi
+    echo "Invalid."
+  done
+}
+
+APT_SIM_OUT=""
+
+cleanup() {
+  [[ -n "${APT_SIM_OUT:-}" && -f "${APT_SIM_OUT:-}" ]] && rm -f "$APT_SIM_OUT" || true
+}
+trap cleanup EXIT
+
+simulate_install() {
+  rm -f "${APT_SIM_OUT:-}" 2>/dev/null || true
+  APT_SIM_OUT="$(mktemp /tmp/apt_sim.XXXXXX)"
+  apt-get -s install "$@" >"$APT_SIM_OUT" 2>&1 || true
+  if grep -qiE "Unable to correct problems|not installable|not going to be installed|held broken packages" "$APT_SIM_OUT"; then
+    return 1
+  fi
+  return 0
+}
+
+extract_missing_deps() {
+  [[ -n "${APT_SIM_OUT:-}" && -f "$APT_SIM_OUT" ]] || return 0
+  awk '
+    BEGIN{IGNORECASE=1}
+    /Depends:/{ 
+      line=$0
+      sub(/^.*Depends:\s*/, "", line)
+      sub(/\s+but.*$/, "", line)
+      split(line, alts, "|")
+      dep=alts[1]
+      gsub(/[(].*$/, "", dep)
+      gsub(/^\s+|\s+$/, "", dep)
+      if (dep != "") print dep
+    }
+  ' "$APT_SIM_OUT" | awk '!seen[$0]++'
+}
+
+safe_apt_recover() {
+  run_step_allow_fail "Repair: dpkg --configure -a" dpkg --configure -a
+  run_step_allow_fail "Repair: apt-get -f install" apt-get -y -f install
+  run_step_allow_fail "Repair: apt-get update" apt-get update
+}
+
+PM="apt-get"
+
+pm_install_smart() {
+  local requested=("$@")
+  local resolved=()
+
+  for p in "${requested[@]}"; do
+    if pkg_exists "$p"; then
+      resolved+=("$p"); continue
+    fi
+    local repl=""
+    if repl="$(offer_replacement "$p")"; then
+      [[ -n "$repl" ]] && resolved+=("$repl")
+    else
+      local rc=$?
+      if [[ $rc -eq 2 ]]; then warn "Skipping missing package: $p"; else warn "No replacement; skipping: $p"; fi
+    fi
+  done
+
+  (( ${#resolved[@]} == 0 )) && { warn "Nothing to install after resolution."; return 0; }
+
+  if ! simulate_install "${resolved[@]}"; then
+    warn "Dependency issues detected for: ${resolved[*]}"
+    echo; echo "APT simulation tail:"; tail -n 80 "$APT_SIM_OUT" || true; echo
+    if ask_yn "Attempt automatic repair (dpkg --configure -a + apt-get -f install)?" "yes"; then
+      safe_apt_recover
+    fi
+    mapfile -t deps < <(extract_missing_deps)
+    if (( ${#deps[@]} > 0 )) && ask_yn "Try installing AVAILABLE missing deps first, then retry?" "yes"; then
+      local dep_install=()
+      for d in "${deps[@]}"; do pkg_exists "$d" && dep_install+=("$d"); done
+      (( ${#dep_install[@]} > 0 )) && run_step_allow_fail "Install missing deps (available)" $PM install -y "${dep_install[@]}"
+    fi
+  fi
+
+  run_step_allow_fail "Install packages: ${resolved[*]}" $PM install -y "${resolved[@]}"
+}
+
+# ============================================================
+# Detect and optionally use nala (without --reinstall)
+# ============================================================
+maybe_use_nala() {
+  run_step_allow_fail "apt-get update (initial)" apt-get update
+  if command -v nala >/dev/null 2>&1; then
+    if ask_yn "Use nala as package manager?" "yes"; then PM="nala"; ok "Using nala."; else PM="apt-get"; fi
+  else
+    if ask_yn "Install nala and use it?" "yes"; then
+      run_step_allow_fail "Install nala" apt-get install -y nala
+      command -v nala >/dev/null 2>&1 && PM="nala" || PM="apt-get"
+    fi
+  fi
+  ok "Selected package manager: $PM"
+}
+
+# ============================================================
+# Machine info
+# ============================================================
+collect_machine_info() {
+  say "Collecting system info (fastfetch preferred)"
+  pm_install_smart fastfetch
+  if command -v fastfetch >/dev/null 2>&1; then
+    run_step_allow_fail "fastfetch" fastfetch
+  else
+    run_step_allow_fail "hostnamectl" hostnamectl
+    run_step_allow_fail "uname -a" uname -a
+    run_step_allow_fail "os-release" bash -lc "cat /etc/os-release || true"
+    run_step_allow_fail "lspci GPUs" bash -lc "lspci -nn | egrep -i 'vga|3d|nvidia|amd' || true"
+  fi
+}
+
+# ============================================================
+# Debian sources enablement (robust)
+# FIXED: file variable expansion bug (no literal '$f' paths)
+# ============================================================
+enable_contrib_nonfree() {
+  say "Enable contrib/non-free/non-free-firmware (robust, best effort)"
+
+  pm_install_smart perl
+
+  local files=()
+  [[ -f /etc/apt/sources.list ]] && files+=("/etc/apt/sources.list")
+  if compgen -G "/etc/apt/sources.list.d/*.list" >/dev/null 2>&1; then
+    while IFS= read -r f; do files+=("$f"); done < <(ls -1 /etc/apt/sources.list.d/*.list 2>/dev/null || true)
+  fi
+
+  if (( ${#files[@]} == 0 )); then
+    warn "No sources list files found to edit."
+    return 0
+  fi
+
+  for f in "${files[@]}"; do
+    run_step_allow_fail "Patch APT components in: $f" bash -lc '
+      set -e
+      perl -0777 -pe q{
+        my @need = qw(contrib non-free non-free-firmware);
+        my @lines = split(/\n/, $_, -1);
+        for my $i (0..$#lines) {
+          my $l = $lines[$i];
+          next if $l =~ /^\s*#/;
+          next unless $l =~ /^\s*deb(?:-src)?\s+/;
+          next unless $l =~ /\bmain\b/;
+
+          my $changed = 0;
+          for my $c (@need) {
+            if ($l !~ /\b\Q$c\E\b/) { $l .= " $c"; $changed = 1; }
+          }
+
+          if ($changed) {
+            my @t = split(/\s+/, $l);
+            my %seen;
+            my @out;
+            for my $tok (@t) {
+              next if $tok eq "";
+              if ($tok =~ /^(contrib|non-free|non-free-firmware)$/) {
+                next if $seen{$tok}++;
+              }
+              push @out, $tok;
+            }
+            $l = join(" ", @out);
+          }
+
+          $lines[$i] = $l;
+        }
+        $_ = join("\n", @lines);
+      } -i $ENV{SRCFILE};
+    ' SRCFILE="$f"
+  done
+
+  run_step_allow_fail "apt-get update (after sources)" apt-get update
+}
+
+# ============================================================
+# Optional repairs + upgrades
+# ============================================================
+optional_repairs_upgrades() {
+  if ask_yn "Run dpkg --configure -a (repair)?" "yes"; then run_step_allow_fail "dpkg --configure -a" dpkg --configure -a; fi
+  if ask_yn "Run apt-get -f install (repair deps)?" "yes"; then run_step_allow_fail "apt-get -f install" apt-get -y -f install; fi
+  if ask_yn "Run apt-get update + full-upgrade now?" "yes"; then
+    run_step_allow_fail "apt-get update" apt-get update
+    run_step_allow_fail "apt-get full-upgrade" apt-get -y full-upgrade
+  fi
+}
+
+# ============================================================
+# User selection + groups
+# ============================================================
+choose_target_user() {
+  local def="${SUDO_USER:-}"
+  [[ -z "$def" || "$def" == "root" ]] && def="$(logname 2>/dev/null || true)"
+  TARGET_USER="$(ask_val "Which user should receive group memberships?" "${def:-}")"
+  [[ -n "$TARGET_USER" ]] && ok "TARGET_USER=$TARGET_USER" || warn "No TARGET_USER provided."
+}
+
+apply_user_groups() {
+  [[ -z "${TARGET_USER:-}" ]] && return 0
+  if ! id "$TARGET_USER" >/dev/null 2>&1; then warn "User '$TARGET_USER' not found; skipping groups."; return 0; fi
+
+  if ask_yn "Add ${TARGET_USER} to sudo group?" "yes"; then
+    run_step_allow_fail "usermod -aG sudo ${TARGET_USER}" usermod -aG sudo "$TARGET_USER"
+  fi
+
+  if ask_yn "Add ${TARGET_USER} to video group?" "yes"; then
+    run_step_allow_fail "usermod -aG video ${TARGET_USER}" usermod -aG video "$TARGET_USER"
+  fi
+
+  if ask_yn "Add ${TARGET_USER} to render group?" "yes"; then
+    getent group render >/dev/null 2>&1 || run_step_allow_fail "Create render group" groupadd render
+    run_step_allow_fail "usermod -aG render ${TARGET_USER}" usermod -aG render "$TARGET_USER"
+  fi
+
+  if ask_yn "Add ${TARGET_USER} to www-data group (useful for local web dev)?" "no"; then
+    run_step_allow_fail "usermod -aG www-data ${TARGET_USER}" usermod -aG www-data "$TARGET_USER"
+  fi
+}
+
+# ============================================================
+# i386 multiarch
+# ============================================================
+enable_i386() {
+  run_step_allow_fail "dpkg --add-architecture i386" dpkg --add-architecture i386
+  run_step_allow_fail "apt-get update (after i386)" apt-get update
+}
+
+# ============================================================
+# Base tooling
+# ============================================================
+install_base_tooling() {
+  pm_install_smart \
+    ca-certificates curl wget gnupg apt-transport-https software-properties-common \
+    git rsync unzip zip p7zip-full jq tmux htop nano vim \
+    pciutils usbutils lsb-release net-tools dnsutils iproute2 traceroute tree file \
+    build-essential pkg-config cmake ninja-build clang llvm dkms \
+    "linux-headers-$(uname -r)"
+}
+
+# ============================================================
+# X11 stack (explicit)
+# ============================================================
+install_x11_stack() {
+  pm_install_smart \
+    xorg xserver-xorg-core xserver-xorg-video-all xserver-xorg-input-all \
+    xinit x11-xserver-utils mesa-utils \
+    libglvnd-dev libegl1-mesa-dev \
+    libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+}
+
+# ============================================================
+# KDE Plasma + SDDM (choose best available meta)
+# ============================================================
+install_kde_sddm() {
+  local choices=()
+  for c in kde-plasma-desktop kde-standard plasma-desktop; do
+    pkg_exists "$c" && choices+=("$c")
+  done
+
+  if (( ${#choices[@]} == 0 )); then
+    warn "No known KDE/Plasma meta package found in APT cache."
+    warn "You can still install X11 only, or search manually: apt-cache search plasma"
+    return 0
+  fi
+
+  echo
+  say "KDE/Plasma meta packages found:"
+  local i=1
+  for c in "${choices[@]}"; do echo "  $i) $c"; i=$((i+1)); done
+  echo "  0) Skip KDE/Plasma install"
+  local sel
+  while true; do
+    sel="$(ask_val "Choose KDE/Plasma meta to install" "1")"
+    [[ "$sel" =~ ^[0-9]+$ ]] || { echo "Invalid."; continue; }
+    (( sel == 0 )) && { warn "Skipping KDE/Plasma."; return 0; }
+    if (( sel >= 1 && sel <= ${#choices[@]} )); then
+      local pick="${choices[$((sel-1))]}"
+      pm_install_smart "$pick" sddm
+      pkg_exists plasma-workspace-x11 && pm_install_smart plasma-workspace-x11 || true
+      run_step_allow_fail "Enable SDDM" systemctl enable sddm
+      run_step_allow_fail "Set graphical target" systemctl set-default graphical.target
+      return 0
+    fi
+    echo "Invalid."
+  done
+}
+
+# ============================================================
+# Terminus console fonts (Debian console-setup)
+# ============================================================
+install_terminus_fonts() {
+  pm_install_smart fonts-terminus console-setup
+  run_step_allow_fail "Update console-setup (CODESET)" sed -i 's/^CODESET=.*/CODESET="guess"/' /etc/default/console-setup
+  run_step_allow_fail "Update console-setup (FONTFACE)" sed -i 's/^FONTFACE=.*/FONTFACE="TerminusBold"/' /etc/default/console-setup
+  run_step_allow_fail "Update console-setup (FONTSIZE)" sed -i 's/^FONTSIZE=.*/FONTSIZE="10x18"/' /etc/default/console-setup
+  run_step_allow_fail "update-initramfs -u (console font)" update-initramfs -u
+}
+
+# ============================================================
+# VS Code (optional)
+# ============================================================
+install_vscode() {
+  pm_install_smart ca-certificates curl gnupg
+  run_step_allow_fail "Create /etc/apt/keyrings" install -d -m 0755 /etc/apt/keyrings
+  run_step_allow_fail "Add Microsoft key" bash -lc "curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg"
+  run_step_allow_fail "chmod keyring" chmod 0644 /etc/apt/keyrings/microsoft.gpg
+  run_step_allow_fail "Add vscode repo list" bash -lc "echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main' > /etc/apt/sources.list.d/vscode.list"
+  run_step_allow_fail "apt-get update (vscode repo)" apt-get update
+  pm_install_smart code
+}
+
+# ============================================================
+# Web stack (optional)
+# ============================================================
+install_web_stack() {
+  pm_install_smart nodejs npm
+  pm_install_smart php php-cli php-fpm php-sqlite3 sqlite3
+  pm_install_smart nginx redis-server postgresql-client
+  pm_install_smart ripgrep fd-find
+}
+
+# ============================================================
+# Yocto deps (optional)
+# ============================================================
+install_yocto_deps() {
+  pm_install_smart \
+    gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio \
+    python3 python3-pip python3-pexpect python3-jinja2 \
+    xz-utils debianutils iputils-ping pylint xterm bzip2 file locales \
+    liblz4-tool gperf libxml2-utils xsltproc zstd lz4 \
+    libsdl1.2-dev
+  run_step_allow_fail "Enable en_US.UTF-8 locale (best effort)" bash -lc "sed -i 's/^# *\\(en_US.UTF-8 UTF-8\\)/\\1/' /etc/locale.gen || true"
+  run_step_allow_fail "locale-gen" locale-gen
+  run_step_allow_fail "update-locale" update-locale LANG=en_US.UTF-8
+}
+
+# ============================================================
+# Xilinx deps (optional)
+# ============================================================
+install_xilinx_deps() {
+  pm_install_smart \
+    gawk make gcc g++ bc bison flex texinfo diffstat chrpath socat cpio xz-utils zstd lz4 \
+    debianutils iputils-ping python3 python3-pexpect python3-jinja2 python3-pip python3-venv \
+    libssl-dev libtool automake autoconf \
+    libncurses-dev zlib1g-dev \
+    libglib2.0-0 libsm6 libice6 libxrender1 libxext6 libx11-6 libxtst6 libxi6 libxft2 libxss1 \
+    libfontconfig1 libfreetype6 \
+    perl tofrodos dos2unix gzip tar screen expect rsync kmod
+  pm_install_smart libtinfo5 || true
+}
+
+# ============================================================
+# SSH + XRDP
+# ============================================================
+configure_ssh() {
+  local port="$1"
+  pm_install_smart openssh-server
+  local cfg="/etc/ssh/sshd_config"
+  if grep -qE '^\s*#?\s*Port\s+' "$cfg"; then
+    run_step_allow_fail "Set SSH Port ${port}" sed -i "s/^\s*#\?\s*Port\s\+.*/Port ${port}/" "$cfg"
+  else
+    run_step_allow_fail "Append SSH Port ${port}" bash -lc "echo 'Port ${port}' >> '$cfg'"
+  fi
+  run_step_allow_fail "Enable ssh" systemctl enable ssh
+  run_step_allow_fail "Restart ssh" systemctl restart ssh
+}
+
+configure_xrdp() {
+  local port="$1"
+  pm_install_smart xrdp xorgxrdp
+  local ini="/etc/xrdp/xrdp.ini"
+  run_step_allow_fail "Set XRDP port=${port}" bash -lc "sed -i -E 's/^[[:space:]]*port=.*/port=${port}/' '$ini' || true"
+  run_step_allow_fail "Enable xrdp" systemctl enable xrdp
+  run_step_allow_fail "Restart xrdp" systemctl restart xrdp
+}
+
+# ============================================================
+# NVIDIA purge + repo + open stack + MOK import
+# ============================================================
+purge_nvidia_stack() {
+  run_step_allow_fail "Purge NVIDIA/CUDA (broad)" bash -lc "apt-get remove --autoremove --purge -y 'cuda-*' 'nvidia-*' 'libnvidia-*' 'xserver-xorg-video-nvidia*' || true"
+  run_step_allow_fail "Remove DKMS leftovers" bash -lc "rm -rf /var/lib/dkms/nvidia* || true"
+  run_step_allow_fail "Remove modprobe leftovers" bash -lc "rm -rf /etc/modprobe.d/nvidia* || true"
+  run_step_allow_fail "Remove pinning leftovers" bash -lc "rm -rf /etc/apt/preferences.d/nvidia* || true"
+  run_step_allow_fail "Remove NVIDIA repo list leftovers" bash -lc "rm -rf /etc/apt/sources.list.d/cuda* /etc/apt/sources.list.d/nvidia* || true"
+  run_step_allow_fail "update-initramfs -u" update-initramfs -u
+  safe_apt_recover
+}
+
+install_mok_tools() {
+  pm_install_smart mokutil shim-signed sbsigntool
+  run_step_allow_fail "mokutil --sb-state" mokutil --sb-state
+}
+
+enable_nvidia_repo_debian13() {
+  local deb="cuda-keyring_1.1-1_all.deb"
+  local url="https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/${deb}"
+  run_step_allow_fail "Download cuda-keyring" bash -lc "rm -f '$deb' && wget -q '$url'"
+  run_step_allow_fail "Install cuda-keyring" dpkg -i "$deb"
+  run_step_allow_fail "apt-get update (after cuda-keyring)" apt-get update
+
+  if ! apt-cache policy | grep -q 'developer.download.nvidia.com/compute/cuda/repos/debian13'; then
+    warn "cuda-keyring didn't activate repo; applying manual repo entry."
+    run_step_allow_fail "Download cuda-archive-keyring.gpg" bash -lc "wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-archive-keyring.gpg"
+    run_step_allow_fail "Install cuda-archive-keyring.gpg" bash -lc "install -D -m 0644 cuda-archive-keyring.gpg /usr/share/keyrings/cuda-archive-keyring.gpg"
+    run_step_allow_fail "Write NVIDIA repo list" bash -lc "echo 'deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/ /' > /etc/apt/sources.list.d/cuda-debian13-amd64.list"
+    run_step_allow_fail "apt-get update (after manual repo add)" apt-get update
+  else
+    ok "NVIDIA repo visible in apt-cache policy."
+  fi
+}
+
+install_nvidia_open_stack() {
+  pkg_exists nvidia-driver-assistant && pm_install_smart nvidia-driver-assistant || true
+  if command -v nvidia-driver-assistant >/dev/null 2>&1; then
+    run_step_allow_fail "nvidia-driver-assistant" nvidia-driver-assistant
+  fi
+
+  pm_install_smart \
+    nvidia-open \
+    nvidia-kernel-open-dkms \
+    nvidia-modprobe \
+    nvidia-persistenced \
+    nvidia-settings \
+    nvidia-smi
+
+  run_step_allow_fail "dkms autoinstall" dkms autoinstall
+  run_step_allow_fail "update-initramfs -u" update-initramfs -u
+
+  if [[ -f /var/lib/dkms/mok.pub ]]; then
+    run_step_allow_fail "mokutil --import /var/lib/dkms/mok.pub (prompts password)" mokutil --import /var/lib/dkms/mok.pub
+  else
+    warn "Expected /var/lib/dkms/mok.pub not found. Find it with:"
+    warn "  sudo find /var/lib/dkms -maxdepth 4 \\( -name mok.pub -o -name MOK.der -o -name '*.der' \\) -print"
+    warn "Then import the correct file with mokutil --import <path>"
+  fi
+}
+
+write_post_reboot_checker() {
+  cat >/root/dev_ready_post_reboot_check.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "=== Secure Boot ==="; mokutil --sb-state || true
+echo; echo "=== NVIDIA nodes ==="; ls -l /dev/nvidia* || true
+echo; echo "=== nvidia-smi ==="; nvidia-smi || true
+echo; echo "=== DKMS status ==="; dkms status | grep -i nvidia || true
+echo; echo "=== Loaded modules ==="; lsmod | grep -i nvidia || true
+echo; echo "=== dmesg (nvidia/mok/secure boot) ==="; dmesg | egrep -i 'nvidia|secure boot|mok' | tail -n 200 || true
+EOF
+  chmod +x /root/dev_ready_post_reboot_check.sh
+  ok "Wrote: /root/dev_ready_post_reboot_check.sh"
+}
+
+# ============================================================
+# MAIN
+# ============================================================
+main() {
+  ensure_root "$@"
+
+  mkdir -p "$(dirname "$LOG")"
+  touch "$LOG"
+  exec > >(tee -a "$LOG") 2>&1
+
+  echo; say "Log file: $LOG"; echo
+  ok "Running as root."
+
+  collect_machine_info
+  optional_repairs_upgrades
+  maybe_use_nala
+  enable_contrib_nonfree
+
+  choose_target_user
+  apply_user_groups
+
+  install_base_tooling
+
+  if ask_yn "Enable i386 multiarch?" "yes"; then enable_i386; fi
+
+  if ask_yn "Install explicit X11 stack?" "yes"; then install_x11_stack; fi
+  if ask_yn "Install KDE Plasma + SDDM (choose best available meta)?" "yes"; then install_kde_sddm; fi
+
+  if ask_yn "Install + configure Terminus console fonts?" "no"; then install_terminus_fonts; fi
+  if ask_yn "Install VS Code (Microsoft repo)?" "yes"; then install_vscode; fi
+  if ask_yn "Install Web/API stack (node/php/sqlite/nginx/redis/psql-client)?" "yes"; then install_web_stack; fi
+  if ask_yn "Install Yocto/OpenEmbedded deps (heavy)?" "yes"; then install_yocto_deps; fi
+  if ask_yn "Install Xilinx Vivado/Vitis/PetaLinux deps (heavy)?" "yes"; then install_xilinx_deps; fi
+
+  if ask_yn "Install + configure OpenSSH server?" "yes"; then
+    SSH_PORT="$(ask_val "SSH port" "22222")"
+    configure_ssh "$SSH_PORT"
+  fi
+
+  if ask_yn "Install + configure XRDP?" "yes"; then
+    XRDP_PORT="$(ask_val "XRDP port" "28673")"
+    configure_xrdp "$XRDP_PORT"
+  fi
+
+  if ask_yn "Purge old NVIDIA/CUDA/pinning first?" "yes"; then purge_nvidia_stack; fi
+
+  if ask_yn "Install Secure Boot / MOK tools?" "yes"; then install_mok_tools; fi
+  if ask_yn "Enable NVIDIA network repo (cuda-keyring / Debian 13)?" "yes"; then enable_nvidia_repo_debian13; fi
+  if ask_yn "Install NVIDIA Open DKMS stack (nvidia-open + nvidia-kernel-open-dkms)?" "yes"; then install_nvidia_open_stack; fi
+
+  write_post_reboot_checker
+
+  echo; say "SUMMARY"
+  echo "  Log: $LOG"
+  if (( ${#FAILURES[@]} > 0 )); then
+    warn "Failures recorded:"
+    for f in "${FAILURES[@]}"; do echo "  - $f"; done
+    echo; warn "Open the log to see exact errors:"
+    echo "  $LOG"
+  else
+    ok "No failures recorded."
+  fi
+
+  echo
+  say "If you installed NVIDIA with Secure Boot ON:"
+  echo "  - You may have been prompted for a MOK password."
+  echo "  - Reboot -> Enroll MOK -> Continue -> Yes -> enter password -> reboot."
+  echo "After login, run:"
+  echo "  sudo /root/dev_ready_post_reboot_check.sh"
+  echo
+
+  if ask_yn "Reboot now (for MOK enrollment)?" "yes"; then
+    read -r -p "Press ENTER to reboot..." _
+    reboot
+  else
+    warn "Reboot skipped."
+  fi
+}
+
+main "$@"
