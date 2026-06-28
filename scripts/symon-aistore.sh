@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+EXPECTED_DEVICE="${EXPECTED_DEVICE:-/dev/nvme0n1p2}"
+STORE_MOUNT="${STORE_MOUNT:-/mnt/symon_store}"
+MODEL_DIR="${MODEL_DIR:-$STORE_MOUNT/models}"
+STAGING_DIR="${STAGING_DIR:-/tmp/symoneural-aistore-downloads}"
+GOPATH_DEFAULT="${HOME}/go"
+GOPATH_EFFECTIVE="${GOPATH:-$GOPATH_DEFAULT}"
+AISTORE_REPO="${AISTORE_REPO:-$GOPATH_EFFECTIVE/src/github.com/NVIDIA/aistore}"
+DOWNLOAD_CONNECTIONS="${DOWNLOAD_CONNECTIONS:-10}"
+
+say() {
+  printf '[*] %s\n' "$*"
+}
+
+ok() {
+  printf '[OK] %s\n' "$*"
+}
+
+fail() {
+  printf '[FAIL] %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  local cmd="$1"
+  command -v "$cmd" >/dev/null 2>&1 || fail "Required command not found: $cmd"
+}
+
+check_store_mount() {
+  require_cmd findmnt
+
+  [[ -b "$EXPECTED_DEVICE" ]] || fail "Expected device not found: $EXPECTED_DEVICE"
+  [[ -d "$STORE_MOUNT" ]] || fail "Mount path not found: $STORE_MOUNT"
+  mountpoint -q "$STORE_MOUNT" || fail "$STORE_MOUNT is not mounted"
+
+  local mounted_source mounted_fstype
+  mounted_source="$(findmnt -n -o SOURCE --target "$STORE_MOUNT")"
+  mounted_fstype="$(findmnt -n -o FSTYPE --target "$STORE_MOUNT")"
+
+  [[ "$mounted_source" == "$EXPECTED_DEVICE" ]] || fail "$STORE_MOUNT is mounted from $mounted_source, expected $EXPECTED_DEVICE"
+  [[ "$mounted_fstype" != fuse* ]] || fail "$STORE_MOUNT is a FUSE mount ($mounted_fstype); use direct NVMe storage instead"
+
+  ok "$STORE_MOUNT is mounted from $EXPECTED_DEVICE using $mounted_fstype"
+}
+
+check_aistore_repo() {
+  [[ -d "$AISTORE_REPO" ]] || fail "AIStore repository not found at $AISTORE_REPO"
+  [[ -f "$AISTORE_REPO/Makefile" ]] || fail "AIStore Makefile not found at $AISTORE_REPO/Makefile"
+}
+
+deploy_aistore() {
+  check_store_mount
+  require_cmd make
+  require_cmd go
+
+  check_aistore_repo
+
+  export AIS_FS_PATHS="\"${STORE_MOUNT}\": \"symon_store\""
+  export TEST_FSPATH_COUNT=0
+
+  say "Deploying AIStore from $AISTORE_REPO with NVMe-backed mountpath $STORE_MOUNT"
+  (
+    cd "$AISTORE_REPO"
+    make kill clean cli aisloader deploy <<< $'1\n1\n0'
+    if command -v ais >/dev/null 2>&1; then
+      ais show cluster
+    else
+      fail "AIStore CLI (ais) was not found after deployment"
+    fi
+  )
+}
+
+stage_download() {
+  local url="${1:-}"
+  local output_name="${2:-}"
+  local staged_file final_path
+
+  [[ -n "$url" ]] || fail "Usage: $0 download <url> [output-name]"
+
+  check_store_mount
+  require_cmd axel
+
+  mkdir -p "$STAGING_DIR" "$MODEL_DIR"
+
+  if [[ -z "$output_name" ]]; then
+    output_name="$(basename "${url%%\?*}")"
+    [[ -n "$output_name" && "$output_name" != "/" && "$output_name" != "." ]] || fail "Could not infer output name from URL; provide one explicitly"
+  fi
+
+  staged_file="$STAGING_DIR/$output_name"
+  final_path="$MODEL_DIR/$output_name"
+
+  say "Downloading to local staging: $staged_file"
+  axel -n "$DOWNLOAD_CONNECTIONS" -o "$staged_file" "$url"
+
+  say "Moving staged artifact to NVMe store: $final_path"
+  mv -f "$staged_file" "$final_path"
+  ok "Model stored at $final_path"
+}
+
+usage() {
+  cat <<EOF
+Usage:
+  $0 check
+  $0 deploy
+  $0 download <url> [output-name]
+
+Environment overrides:
+  EXPECTED_DEVICE    Expected backing device (default: /dev/nvme0n1p2)
+  STORE_MOUNT        Mounted NVMe path (default: /mnt/symon_store)
+  MODEL_DIR          Final model directory (default: /mnt/symon_store/models)
+  STAGING_DIR        Local non-FUSE staging directory (default: /tmp/symoneural-aistore-downloads)
+  AISTORE_REPO       AIStore checkout path (default: \$GOPATH/src/github.com/NVIDIA/aistore)
+EOF
+}
+
+main() {
+  local cmd="${1:-}"
+  case "$cmd" in
+    check)
+      check_store_mount
+      ;;
+    deploy)
+      deploy_aistore
+      ;;
+    download)
+      shift || true
+      stage_download "${1:-}" "${2:-}"
+      ;;
+    ""|-h|--help|help)
+      usage
+      ;;
+    *)
+      fail "Unknown command: $cmd"
+      ;;
+  esac
+}
+
+main "$@"

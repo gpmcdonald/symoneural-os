@@ -29,6 +29,52 @@ You can choose between:
 
 ---
 
+## ⚡ Phase 2: High-Performance Storage (AIStore)
+
+To avoid disk I/O bottlenecks and FUSE-backed storage overhead, model artifacts must live on the direct NVMe partition mounted at `/mnt/symon_store` from `/dev/nvme0n1p2`.
+
+### AIStore prerequisites
+
+- `/dev/nvme0n1p2` exists and is mounted at `/mnt/symon_store`
+- AIStore is checked out at `$GOPATH/src/github.com/NVIDIA/aistore`
+- `go`, `make`, and `axel` are installed
+
+### Validate the NVMe-backed store
+
+Use the repository helper before deploying or downloading models:
+
+```bash
+./scripts/symon-aistore.sh check
+```
+
+### Initialize AIStore
+
+The helper validates the mount, configures AIStore to use `/mnt/symon_store` as a preconfigured mountpath, deploys a minimal local cluster, and verifies cluster health:
+
+```bash
+./scripts/symon-aistore.sh deploy
+```
+
+This wraps the Phase 2 workflow around the standard AIStore local deployment flow:
+
+```bash
+cd "$GOPATH/src/github.com/NVIDIA/aistore"
+make kill clean cli aisloader deploy <<< $'1\n1\n0'
+ais show cluster
+```
+
+### Optimal model downloading strategy
+
+Do not stream large model downloads directly into a FUSE or Rclone mount. Stage them locally first with `axel`, then move them onto the NVMe-backed store:
+
+```bash
+./scripts/symon-aistore.sh download <url> [output-name]
+```
+
+The helper downloads into `/tmp/symoneural-aistore-downloads` first and then moves the finished artifact into `/mnt/symon_store/models`.
+
+---
+
 ## 📂 Project Structure
 
 The repository is organized into the following key components:
@@ -37,7 +83,7 @@ The repository is organized into the following key components:
   Custom system orchestrator layer and Scarthgap migration templates.
 
 - **`scripts/`**:  
-  Tools for audit (`symon-audit.py`) and build management (`symon-portal.sh`).
+  Tools for audit (`symon-audit.py`), build management (`symon-portal.sh`), and AIStore/NVMe workflows (`symon-aistore.sh`).
 
 - **`manifest.json`**:  
   The project's "Source of Truth" for version tracking and branch alignment.
