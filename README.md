@@ -65,7 +65,7 @@ ais show cluster
 
 ### Optimal model downloading strategy
 
-Do not stream large model downloads directly into a FUSE or Rclone mount. Stage them locally first with `axel`, then move them onto the NVMe-backed store to avoid FUSE overhead, degraded throughput, and partially written artifacts from interrupted streaming downloads:
+Do not stream large model downloads directly into a FUSE or Rclone mount. Stage them locally first with `axel`, then move them onto the NVMe-backed store. This avoids FUSE overhead, degraded throughput, and partially written artifacts from interrupted streaming downloads:
 
 ```bash
 ./scripts/symon-aistore.sh download <url> [output-name]

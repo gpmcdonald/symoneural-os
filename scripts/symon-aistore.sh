@@ -80,9 +80,9 @@ deploy_aistore() {
 stage_download() {
   local url="${1:-}"
   local output_name="${2:-}"
-  local staged_file final_path url_without_query
+  local staged_file final_path url_without_query query_delim='?'
 
-  [[ -n "$url" ]] || fail "Usage: ./scripts/symon-aistore.sh download <url> [output-name]"
+  [[ -n "$url" ]] || fail "Usage: $0 download <url> [output-name]"
 
   check_store_mount
   require_cmd axel
@@ -90,7 +90,7 @@ stage_download() {
   mkdir -p "$STAGING_DIR" "$MODEL_DIR"
 
   if [[ -z "$output_name" ]]; then
-    url_without_query="${url%%\?*}"
+    url_without_query="${url%%"${query_delim}"*}"
     output_name="$(basename "$url_without_query")"
     [[ -n "$output_name" && "$output_name" != "/" && "$output_name" != "." ]] || fail "Could not infer output name from URL; provide one explicitly"
   fi
