@@ -57,6 +57,8 @@ deploy_aistore() {
 
   check_aistore_repo
 
+  # AIS_FS_PATHS is inserted into AIStore's existing JSON object template, so this
+  # value must be a single `"path": "label"` entry rather than a full JSON object.
   printf -v AIS_FS_PATHS '"%s": "%s"' "$STORE_MOUNT" "symon_store"
   export AIS_FS_PATHS
   # AIStore's local deploy script expects TEST_FSPATH_COUNT; setting it to 0 tells
@@ -80,7 +82,7 @@ deploy_aistore() {
 stage_download() {
   local url="${1:-}"
   local output_name="${2:-}"
-  local staged_file final_path url_without_query query_delim='?'
+  local staged_file final_path url_without_query
 
   [[ -n "$url" ]] || fail "Usage: $0 download <url> [output-name]"
 
@@ -90,7 +92,10 @@ stage_download() {
   mkdir -p "$STAGING_DIR" "$MODEL_DIR"
 
   if [[ -z "$output_name" ]]; then
-    url_without_query="${url%%"${query_delim}"*}"
+    url_without_query="$url"
+    if [[ "$url_without_query" == *\?* ]]; then
+      url_without_query="${url_without_query%%\?*}"
+    fi
     output_name="$(basename "$url_without_query")"
     [[ -n "$output_name" && "$output_name" != "/" && "$output_name" != "." ]] || fail "Could not infer output name from URL; provide one explicitly"
   fi
@@ -132,7 +137,7 @@ main() {
       deploy_aistore
       ;;
     download)
-      shift || true
+      shift
       stage_download "${1:-}" "${2:-}"
       ;;
     ""|-h|--help|help)
