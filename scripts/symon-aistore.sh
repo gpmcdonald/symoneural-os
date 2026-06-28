@@ -103,7 +103,7 @@ stage_download() {
       url_without_query="${url_without_query%%\?*}"
     fi
     output_name="$(basename "$url_without_query")"
-    [[ -n "$output_name" && "$output_name" != "/" && "$output_name" != "." ]] || fail "Could not infer output name from URL; provide one explicitly"
+    [[ -n "$output_name" && "$output_name" != "/" && "$output_name" != "." ]] || fail "Could not infer output name from URL (must end with valid filename); provide one explicitly"
   fi
 
   staged_file="$STAGING_DIR/$output_name"
