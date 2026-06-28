@@ -110,7 +110,9 @@ stage_download() {
   final_path="$MODEL_DIR/$output_name"
 
   say "Downloading to local staging: $staged_file"
-  axel -n "$DOWNLOAD_CONNECTIONS" -o "$staged_file" "$url"
+  if ! axel -n "$DOWNLOAD_CONNECTIONS" -o "$staged_file" "$url"; then
+    fail "axel failed to download $url to $staged_file"
+  fi
 
   say "Moving staged artifact to NVMe store: $final_path"
   mv -f "$staged_file" "$final_path"
