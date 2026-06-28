@@ -35,7 +35,7 @@ To avoid disk I/O bottlenecks and FUSE-backed storage overhead, model artifacts 
 
 ### AIStore prerequisites
 
-- `/dev/nvme0n1p2` exists and is mounted at `/mnt/symon_store`
+- `/dev/nvme0n1p2` is already provisioned by the operator and mounted at `/mnt/symon_store`
 - AIStore is checked out at `$GOPATH/src/github.com/NVIDIA/aistore`
 - `go`, `make`, and `axel` are installed
 

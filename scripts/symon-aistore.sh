@@ -57,12 +57,15 @@ deploy_aistore() {
 
   check_aistore_repo
 
-  export AIS_FS_PATHS="\"${STORE_MOUNT}\": \"symon_store\""
+  printf -v AIS_FS_PATHS '"%s": "%s"' "$STORE_MOUNT" "symon_store"
+  export AIS_FS_PATHS
   export TEST_FSPATH_COUNT=0
 
   say "Deploying AIStore from $AISTORE_REPO with NVMe-backed mountpath $STORE_MOUNT"
   (
     cd "$AISTORE_REPO"
+    # Answers AIStore's local deploy prompts with:
+    # 1 target, 1 proxy, 0 generated test mountpaths (use preconfigured fspaths instead).
     make kill clean cli aisloader deploy <<< $'1\n1\n0'
     if command -v ais >/dev/null 2>&1; then
       ais show cluster
@@ -85,7 +88,7 @@ stage_download() {
   mkdir -p "$STAGING_DIR" "$MODEL_DIR"
 
   if [[ -z "$output_name" ]]; then
-    output_name="$(basename "${url%%\?*}")"
+    output_name="$(basename "${url%%?*}")"
     [[ -n "$output_name" && "$output_name" != "/" && "$output_name" != "." ]] || fail "Could not infer output name from URL; provide one explicitly"
   fi
 
